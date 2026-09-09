@@ -1,0 +1,44 @@
+# Architecture / 架构
+
+## 1. Boundary / 边界
+
+The adapter owns data identification, scientific metadata validation, bounded-memory access, canonical HDF5 writing, and explicit export. It does not perform InSAR inversion, atmospheric correction, phase linking, or figure composition.
+
+Adapter 负责数据识别、科学元数据校验、受控内存访问、标准 HDF5 写入和显式导出；不负责 InSAR 反演、大气改正、相位链接或图件排版。
+
+```text
+GAMMA / MintPy / PS-DS-InSAR
+              │
+              ▼
+       source adapters
+              │
+              ▼
+      canonical data API
+              │
+       ┌──────┼────────┐
+       ▼      ▼        ▼
+     HDF5   GRD/TIF  Defsour
+       │
+       ▼
+ PyGMT / Matplotlib / analysis
+```
+
+## 2. Component Rules / 组件规则
+
+- `model.py` contains format-neutral summaries only.<br>`model.py` 只保存与来源无关的摘要模型。
+- `hdf5.py` detects and inspects HDF5 metadata without reading full arrays.<br>`hdf5.py` 识别并检查 HDF5 元数据，不读取完整数组。
+- Future `sources/` modules will own MintPy, LiCSBAS, GAMMA, and PS/DS access.<br>后续 `sources/` 模块分别负责 MintPy、LiCSBAS、GAMMA 和 PS/DS 访问。
+- Future `writers/` and `exporters/` modules will own canonical products and exchange formats.<br>后续 `writers/` 和 `exporters/` 分别负责标准产品和交换格式。
+- Plotting repositories consume the public API and must not duplicate source-format parsing.<br>绘图仓库只消费公共 API，不再重复解析源格式。
+
+## 3. Phases / 阶段
+
+1. Define contracts and implement read-only HDF5 inspection and validation.<br>定义契约，实现只读 HDF5 检查与校验。
+2. Implement canonical HDF5 readers/writers with atomic, chunked output.<br>实现标准 HDF5 读写和原子分块输出。
+3. Implement GAMMA memmap and MintPy/LiCSBAS source adapters.<br>实现 GAMMA memmap 以及 MintPy/LiCSBAS 来源适配。
+4. Implement PS/DS point schema and chunked exporters.<br>实现 PS/DS 点 schema 和分块导出。
+5. Integrate PyGMT `scatter`, `grid`, and `auto` render modes.<br>接入 PyGMT 的 `scatter`、`grid` 和 `auto` 绘图模式。
+
+No phase should require a broad rewrite of an upstream processing repository.
+
+任何阶段都不应要求大范围重写上游处理仓库。
