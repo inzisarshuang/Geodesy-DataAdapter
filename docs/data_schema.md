@@ -53,6 +53,15 @@ configured row ceiling is larger.
 形变数据集必须分块。第二阶段每块包含一个时期，并限制行数，使 float32
 块即使在配置上限较大时也维持在约 1 MiB。
 
+The Phase 3A MintPy converter preserves `X_FIRST/Y_FIRST` as the first pixel
+centres, copies deformation values in the source unit, and requires explicit
+DEM and static-mask inputs. It records MintPy `REF_DATE`, `REF_Y`, and `REF_X`
+without re-referencing the data.
+
+第三阶段 A 的 MintPy 转换器将 `X_FIRST/Y_FIRST` 保留为首个像元中心，按来源
+单位原样复制形变，并要求显式 DEM 与静态掩膜输入。程序记录 MintPy 的
+`REF_DATE`、`REF_Y` 和 `REF_X`，但不重新参考数据。
+
 ## 3. Sparse PS/DS Point Time Series / 稀疏 PS/DS 点时序
 
 Schema identifier: `insar_point_timeseries/1.0`.

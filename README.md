@@ -1,8 +1,8 @@
 # InSAR-Data-Adapter
 
-InSAR-Data-Adapter is the data-contract layer between scientific processing systems such as GAMMA, MintPy, and future PS/DS-InSAR workflows and consumers such as PyGMT-Plotter. Phase 1 provides read-only source inspection. Phase 2 adds bounded-memory, atomic canonical grid HDF5 reading and writing. Source conversion is not implemented yet.
+InSAR-Data-Adapter is the data-contract layer between scientific processing systems such as GAMMA, MintPy, and future PS/DS-InSAR workflows and consumers such as PyGMT-Plotter. Phase 1 provides read-only source inspection, Phase 2 adds bounded-memory canonical grid HDF5 I/O, and Phase 3A adds strict MintPy grid conversion.
 
-InSAR-Data-Adapter 是 GAMMA、MintPy、后续 PS/DS-InSAR 等科学处理系统与 PyGMT-Plotter 等消费端之间的数据契约层。第一阶段提供来源只读检查；第二阶段增加受控内存、原子发布的标准规则栅格 HDF5 读写。来源转换尚未实现。
+InSAR-Data-Adapter 是 GAMMA、MintPy、后续 PS/DS-InSAR 等科学处理系统与 PyGMT-Plotter 等消费端之间的数据契约层。第一阶段提供来源只读检查，第二阶段增加受控内存的标准规则栅格 HDF5 读写，第三阶段 A 增加严格的 MintPy 规则栅格转换。
 
 ## 1. Responsibilities / 职责
 
@@ -11,9 +11,9 @@ InSAR-Data-Adapter 是 GAMMA、MintPy、后续 PS/DS-InSAR 等科学处理系统
 - Validate time dimensions, spatial dimensions, date vectors, units, and source-format expectations.<br>校验时间维、空间维、日期向量、单位和预期源格式。
 - Define separate canonical layouts for dense grids and sparse PS/DS points.<br>分别定义规则栅格与稀疏 PS/DS 点的标准布局。
 
-GAMMA memmap input, MintPy/LiCSBAS conversion, PS/DS point writing, Defsour/GRD/GeoTIFF exporters, and PyGMT integration are intentionally deferred to later phases.
+GAMMA memmap input, LiCSBAS conversion, PS/DS point writing, Defsour/GRD/GeoTIFF exporters, and PyGMT integration are intentionally deferred to later phases.
 
-GAMMA memmap 输入、MintPy/LiCSBAS 转换、PS/DS 点写入、Defsour/GRD/GeoTIFF 导出及 PyGMT 接入明确留到后续阶段。
+GAMMA memmap 输入、LiCSBAS 转换、PS/DS 点写入、Defsour/GRD/GeoTIFF 导出及 PyGMT 接入明确留到后续阶段。
 
 ## 2. Installation / 安装
 
@@ -38,7 +38,17 @@ cfg 中的路径相对于 cfg 文件解析。JSON 输出可直接用于日志和
 - [`docs/data_schema.md`](docs/data_schema.md): canonical grid and point time-series schemas.<br>规则栅格与点时序标准 schema。
 - [`docs/cfg_contract.md`](docs/cfg_contract.md): shared cfg behavior and Phase 1 keys.<br>公共 cfg 行为和第一阶段参数。
 
-## 5. Canonical Grid API / 标准栅格 API
+## 5. MintPy Grid Conversion / MintPy 规则栅格转换
+
+The converter reads `/timeseries` by epoch and row block. It copies deformation values and units unchanged. A DEM, a static validity mask, LOS sign, nodata policy, and height unit must all be explicit; missing geometry is never replaced with a zero DEM.
+
+转换器按时期和行块读取 `/timeseries`，原样保留形变值与单位。DEM、静态有效掩膜、LOS 正负号、nodata 规则及高程单位都必须显式提供；缺失的几何信息绝不会用零 DEM 代替。
+
+```bash
+insar-adapter convert-mintpy --config config_examples/mintpy_to_canonical.cfg
+```
+
+## 6. Canonical Grid API / 标准栅格 API
 
 Writers accept complete epochs for moderate grids or full-column row blocks for large grids. Required geometry follows the same row-block pattern. The destination appears only after every epoch row and geometry row has been written and validated.
 
@@ -71,7 +81,7 @@ The example uses complete arrays only for readability. Production source adapter
 
 示例为便于阅读使用完整数组；正式来源 Adapter 将使用受控行块反复调用 `write_deformation_rows` 和 `write_geometry_rows`。
 
-## 6. Verification / 验证
+## 7. Verification / 验证
 
 ```bash
 python -m compileall -q src tests

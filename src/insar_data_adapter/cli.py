@@ -3,7 +3,7 @@ cli
 ===
 
 功能概述:
-    提供 cfg 驱动的只读 inspect 和 validate 命令；不执行格式转换或文件写入。
+    提供 cfg 驱动的 inspect、validate 和 MintPy 规则栅格转换命令。
 
 函数说明:
     ``build_parser``:
@@ -17,7 +17,8 @@ from __future__ import annotations
 import argparse
 import json
 
-from .config import load_inspect_config
+from .config import load_inspect_config, load_mintpy_conversion_config
+from .converters import convert_mintpy_grid
 from .hdf5 import inspect_hdf5
 
 
@@ -28,12 +29,18 @@ def build_parser() -> argparse.ArgumentParser:
     for command in ("inspect", "validate"):
         subparser = subparsers.add_parser(command)
         subparser.add_argument("--config", required=True)
+    convert_mintpy = subparsers.add_parser("convert-mintpy")
+    convert_mintpy.add_argument("--config", required=True)
     return parser
 
 
 def main() -> None:
-    """Inspect or validate one configured HDF5 input without modifying it."""
+    """Run one configured read-only inspection or atomic MintPy conversion."""
     arguments = build_parser().parse_args()
+    if arguments.command == "convert-mintpy":
+        output = convert_mintpy_grid(load_mintpy_conversion_config(arguments.config))
+        print(f"WROTE: {output}")
+        return
     config = load_inspect_config(arguments.config)
     summary = inspect_hdf5(
         config["input_file"],

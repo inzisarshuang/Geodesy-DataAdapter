@@ -24,6 +24,28 @@ input_type = auto
 require_unit = true
 ```
 
-Conversion keys are deferred until the canonical writer exists, so Phase 1 cfg files cannot imply that data have been converted.
+Inspection and conversion use separate strict key sets, so an inspection cfg cannot accidentally trigger a conversion.
 
-转换参数留待标准写入器完成后定义，因此第一阶段 cfg 不会造成“已经完成数据转换”的误解。
+检查与转换使用不同的严格参数集合，因此检查 cfg 不会意外触发转换。
+
+## 3. MintPy Grid Conversion Keys / MintPy 规则栅格转换参数
+
+| Key | Required | Meaning / Values |
+|---|---:|---|
+| `timeseries_file` | yes | MintPy HDF5 with `/timeseries` and `/date` |
+| `geometry_file` | yes | HDF5 containing the DEM |
+| `mask_file` | yes | HDF5 containing a static non-zero-is-valid mask; may equal `geometry_file` |
+| `output_file` | yes | Canonical HDF5 destination |
+| `height_dataset` | no | DEM dataset; default `height` |
+| `mask_dataset` | no | mask dataset; default `mask` |
+| `los_positive` | yes | explicit LOS sign convention |
+| `nodata_policy` | yes | explicit free-text zero, NaN, finite nodata, and mask semantics |
+| `height_unit` | yes | explicit DEM unit |
+| `chunk_rows` | no | positive input row-block ceiling; default `256` |
+| `compression` | no | `none`, `gzip`, or `lzf`; default `gzip` |
+| `compression_level` | no | integer `0`–`9`; default `4`, used by gzip |
+| `overwrite` | no | `true` or `false`; default `false` |
+
+The source must contain geocoded `X_FIRST`, `X_STEP`, `Y_FIRST`, `Y_STEP`, `EPSG`, `REF_DATE`, `REF_X`, and `REF_Y` attributes. `X_FIRST/Y_FIRST` are preserved as pixel-centre coordinates, matching MintPy's convention. Deformation is copied without unit scaling, nodata replacement, re-referencing, reprojection, or resampling. A mask that marks a non-finite DEM cell as valid is rejected instead of being silently changed.
+
+来源必须包含地理编码属性 `X_FIRST`、`X_STEP`、`Y_FIRST`、`Y_STEP`、`EPSG`、`REF_DATE`、`REF_X` 和 `REF_Y`。依照 MintPy 约定，`X_FIRST/Y_FIRST` 原样作为像元中心坐标。形变复制过程中不进行单位缩放、nodata 替换、重新参考、重投影或重采样。若掩膜把非有限 DEM 像元标为有效，程序将报错，而不是静默修改掩膜。
