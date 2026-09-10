@@ -28,13 +28,14 @@ GAMMA / MintPy / PS-DS-InSAR
 - `model.py` contains format-neutral summaries only.<br>`model.py` 只保存与来源无关的摘要模型。
 - `hdf5.py` detects and inspects HDF5 metadata without reading full arrays.<br>`hdf5.py` 识别并检查 HDF5 元数据，不读取完整数组。
 - Future `sources/` modules will own MintPy, LiCSBAS, GAMMA, and PS/DS access.<br>后续 `sources/` 模块分别负责 MintPy、LiCSBAS、GAMMA 和 PS/DS 访问。
-- Future `writers/` and `exporters/` modules will own canonical products and exchange formats.<br>后续 `writers/` 和 `exporters/` 分别负责标准产品和交换格式。
+- `canonical.py` owns bounded-memory canonical grid reading and atomic writing.<br>`canonical.py` 负责受控内存的标准栅格读取和原子写入。
+- Future `writers/` and `exporters/` modules will own source conversion and exchange formats.<br>后续 `writers/` 和 `exporters/` 分别负责来源转换和交换格式。
 - Plotting repositories consume the public API and must not duplicate source-format parsing.<br>绘图仓库只消费公共 API，不再重复解析源格式。
 
 ## 3. Phases / 阶段
 
 1. Define contracts and implement read-only HDF5 inspection and validation.<br>定义契约，实现只读 HDF5 检查与校验。
-2. Implement canonical HDF5 readers/writers with atomic, chunked output.<br>实现标准 HDF5 读写和原子分块输出。
+2. Implement canonical grid HDF5 readers/writers with atomic, chunked output (complete).<br>实现标准规则栅格 HDF5 读写和原子分块输出（已完成）。
 3. Implement GAMMA memmap and MintPy/LiCSBAS source adapters.<br>实现 GAMMA memmap 以及 MintPy/LiCSBAS 来源适配。
 4. Implement PS/DS point schema and chunked exporters.<br>实现 PS/DS 点 schema 和分块导出。
 5. Integrate PyGMT `scatter`, `grid`, and `auto` render modes.<br>接入 PyGMT 的 `scatter`、`grid` 和 `auto` 绘图模式。

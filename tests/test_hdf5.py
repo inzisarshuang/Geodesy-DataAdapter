@@ -40,13 +40,37 @@ class HDF5InspectionTests(unittest.TestCase):
         """Recognize the documented canonical grid schema and nested datasets."""
         source = self.root / "canonical.h5"
         with h5py.File(source, "w") as handle:
-            handle.attrs["insar_schema"] = "insar_grid_timeseries/1.0"
-            handle.attrs["deformation_unit"] = "mm"
-            handle.attrs["crs"] = "EPSG:4326"
-            handle.create_dataset("data/displacement", shape=(2, 3, 4), dtype="float32")
+            handle.attrs.update(
+                {
+                    "insar_schema": "insar_grid_timeseries/1.0",
+                    "source_format": "synthetic",
+                    "deformation_unit": "mm",
+                    "deformation_quantity": "cumulative_displacement",
+                    "los_positive": "toward_satellite",
+                    "crs": "EPSG:4326",
+                    "nodata_policy": "NaN is nodata; zero is valid",
+                    "temporal_reference": "20200101",
+                    "spatial_reference": "none",
+                    "source_provenance": "synthetic test",
+                    "height_unit": "m",
+                    "grid_registration": "pixel",
+                    "write_complete": True,
+                }
+            )
+            handle.create_dataset(
+                "data/displacement",
+                shape=(2, 3, 4),
+                dtype="float32",
+                chunks=(1, 3, 4),
+            )
             handle.create_dataset(
                 "time/date_yyyymmdd", data=[b"20200101", b"20200113"]
             )
+            handle.create_dataset("time/epoch_id", data=[1, 2])
+            handle.create_dataset("geometry/x", data=[10.0, 11.0, 12.0, 13.0])
+            handle.create_dataset("geometry/y", data=[20.0, 19.0, 18.0])
+            handle.create_dataset("geometry/height", shape=(3, 4), dtype="float32")
+            handle.create_dataset("geometry/valid_mask", shape=(3, 4), dtype="uint8")
         self.assertEqual(detect_hdf5_format(source), "standard")
         summary = inspect_hdf5(source, expected_format="standard")
         self.assertEqual(summary.schema, "insar_grid_timeseries/1.0")

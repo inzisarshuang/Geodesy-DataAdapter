@@ -11,6 +11,7 @@ Every canonical file must record the following root attributes.
 | `insar_schema` | `insar_grid_timeseries/1.0` or `insar_point_timeseries/1.0` |
 | `source_format` | Original producer, for example `gamma`, `mintpy`, or `psds` |
 | `deformation_unit` | Explicit unit such as `m`, `cm`, or `mm` |
+| `height_unit` | Explicit elevation unit, normally `m` |
 | `deformation_quantity` | `cumulative_displacement` or `velocity` |
 | `los_positive` | Explicit LOS sign description; never inferred |
 | `crs` | EPSG, WKT, or another unambiguous CRS representation |
@@ -18,6 +19,7 @@ Every canonical file must record the following root attributes.
 | `temporal_reference` | Preserved, first, or an explicit epoch identifier |
 | `spatial_reference` | Reference pixel/point description or `none` |
 | `source_provenance` | Source paths or a manifest reference |
+| `write_complete` | `true` only after every required block has been written and validated |
 
 ## 2. Dense Grid Time Series / 规则栅格时序
 
@@ -27,15 +29,29 @@ Schema identifier: `insar_grid_timeseries/1.0`.
 /time/date_yyyymmdd          [time]
 /time/epoch_id               [time]
 /data/displacement           [time, row, column]
+/geometry/x                  [column]
+/geometry/y                  [row]
 /geometry/height             [row, column]
 /geometry/valid_mask         [row, column]
 /geometry/longitude          [row, column] optional
 /geometry/latitude           [row, column] optional
 ```
 
-The displacement dataset must be chunked. A map-oriented initial recommendation is one or a few epochs per chunk; the final chunk policy will be benchmarked in Phase 2.
+`x` and `y` are pixel-centre coordinates in the root `crs`. The required
+`grid_registration` root attribute is `pixel` or `gridline`; Phase 2 writers
+use `pixel`. Curvilinear longitude/latitude grids are optional additions and
+must occur as a pair.
 
-形变数据集必须分块。面向地图读取时初步建议每块包含一个或少量时期；最终分块策略将在第二阶段实测确定。
+`x`、`y` 是根属性 `crs` 下的像元中心坐标。必填根属性
+`grid_registration` 可为 `pixel` 或 `gridline`；第二阶段写入器使用
+`pixel`。曲线网格的经纬度二维数组为可选项，且必须成对出现。
+
+The displacement dataset must be chunked. Phase 2 writes one epoch per chunk
+and limits the row count so a float32 chunk remains near 1 MiB even when the
+configured row ceiling is larger.
+
+形变数据集必须分块。第二阶段每块包含一个时期，并限制行数，使 float32
+块即使在配置上限较大时也维持在约 1 MiB。
 
 ## 3. Sparse PS/DS Point Time Series / 稀疏 PS/DS 点时序
 
