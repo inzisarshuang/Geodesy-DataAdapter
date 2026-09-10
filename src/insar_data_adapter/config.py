@@ -3,7 +3,7 @@ config
 ======
 
 功能概述:
-    严格解析检查、MintPy 及 LiCSBAS 转换 cfg，并按 cfg 目录解析路径。
+    严格解析检查、MintPy、LiCSBAS 及 GAMMA 转换 cfg，并按 cfg 目录解析路径。
 
 函数说明:
     ``load_inspect_config``:
@@ -12,10 +12,13 @@ config
         读取 MintPy 到标准栅格 HDF5 的显式转换参数。
     ``load_licsbas_conversion_config``:
         读取 LiCSBAS 到标准栅格 HDF5 的显式转换参数。
+    ``load_gamma_conversion_config``:
+        读取地理编码 GAMMA 二进制时序到标准栅格 HDF5 的显式转换参数。
 """
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 
@@ -50,6 +53,37 @@ _LICSBAS_CONVERSION_KEYS = {
     "crs",
     "los_positive",
     "nodata_policy",
+    "temporal_reference",
+    "temporal_reference_date",
+    "source_temporal_reference",
+    "grid_registration",
+    "chunk_rows",
+    "compression",
+    "compression_level",
+    "overwrite",
+}
+
+_GAMMA_CONVERSION_KEYS = {
+    "tab_file",
+    "dates_file",
+    "parameter_file",
+    "height_file",
+    "mask_file",
+    "output_file",
+    "deformation_dtype",
+    "deformation_byte_order",
+    "height_dtype",
+    "height_byte_order",
+    "mask_dtype",
+    "mask_byte_order",
+    "deformation_unit",
+    "height_unit",
+    "crs",
+    "los_positive",
+    "nodata_policy",
+    "deformation_nodata",
+    "height_nodata",
+    "spatial_reference",
     "temporal_reference",
     "temporal_reference_date",
     "source_temporal_reference",
@@ -116,6 +150,19 @@ def _parse_integer(
             else f" >= {minimum}"
         )
         raise ValueError(f"{key} must be{limit}, got {parsed}")
+    return parsed
+
+
+def _parse_optional_number(values: dict[str, str], key: str) -> float | None:
+    """Parse one optional finite floating-point cfg value."""
+    if key not in values:
+        return None
+    try:
+        parsed = float(values[key])
+    except ValueError as error:
+        raise ValueError(f"{key} must be a number, got {values[key]!r}") from error
+    if not math.isfinite(parsed):
+        raise ValueError(f"{key} must be finite")
     return parsed
 
 
@@ -220,6 +267,86 @@ def load_licsbas_conversion_config(config_file: str | Path) -> dict[str, object]
         "crs": values["crs"],
         "los_positive": values["los_positive"],
         "nodata_policy": values["nodata_policy"],
+        "temporal_reference": temporal_reference,
+        "temporal_reference_date": values.get("temporal_reference_date"),
+        "source_temporal_reference": values.get("source_temporal_reference"),
+        "grid_registration": registration,
+        "chunk_rows": _parse_integer(values.get("chunk_rows", "256"), "chunk_rows", 1),
+        "compression": None if compression == "none" else compression,
+        "compression_level": _parse_integer(
+            values.get("compression_level", "4"), "compression_level", 0, 9
+        ),
+        "overwrite": _parse_bool(values.get("overwrite", "false"), "overwrite"),
+    }
+
+
+def load_gamma_conversion_config(config_file: str | Path) -> dict[str, object]:
+    """Load strict geocoded GAMMA binary-grid conversion settings."""
+    path = Path(config_file).expanduser().resolve()
+    values = _read_strict_config(path, _GAMMA_CONVERSION_KEYS)
+    required = {
+        "tab_file",
+        "dates_file",
+        "parameter_file",
+        "height_file",
+        "mask_file",
+        "output_file",
+        "deformation_dtype",
+        "deformation_byte_order",
+        "height_dtype",
+        "height_byte_order",
+        "mask_dtype",
+        "mask_byte_order",
+        "deformation_unit",
+        "height_unit",
+        "crs",
+        "los_positive",
+        "nodata_policy",
+        "spatial_reference",
+        "temporal_reference",
+        "grid_registration",
+    }
+    missing = sorted(required.difference(values))
+    if missing:
+        raise ValueError(f"required GAMMA conversion cfg keys are missing: {missing}")
+    registration = values["grid_registration"].lower()
+    if registration != "pixel":
+        raise ValueError("GAMMA corner coordinates require grid_registration = pixel")
+    temporal_reference = values["temporal_reference"].lower()
+    if temporal_reference not in {"preserve", "date"}:
+        raise ValueError("temporal_reference must be preserve or date")
+    if temporal_reference == "preserve" and "source_temporal_reference" not in values:
+        raise ValueError(
+            "source_temporal_reference is required when temporal_reference = preserve"
+        )
+    if temporal_reference == "date" and "temporal_reference_date" not in values:
+        raise ValueError(
+            "temporal_reference_date is required when temporal_reference = date"
+        )
+    compression = values.get("compression", "gzip").lower()
+    if compression not in {"none", "gzip", "lzf"}:
+        raise ValueError("compression must be none, gzip, or lzf")
+    return {
+        "tab_file": _resolve_path(values["tab_file"], path),
+        "dates_file": _resolve_path(values["dates_file"], path),
+        "parameter_file": _resolve_path(values["parameter_file"], path),
+        "height_file": _resolve_path(values["height_file"], path),
+        "mask_file": _resolve_path(values["mask_file"], path),
+        "output_file": _resolve_path(values["output_file"], path),
+        "deformation_dtype": values["deformation_dtype"],
+        "deformation_byte_order": values["deformation_byte_order"].lower(),
+        "height_dtype": values["height_dtype"],
+        "height_byte_order": values["height_byte_order"].lower(),
+        "mask_dtype": values["mask_dtype"],
+        "mask_byte_order": values["mask_byte_order"].lower(),
+        "deformation_unit": values["deformation_unit"],
+        "height_unit": values["height_unit"],
+        "crs": values["crs"],
+        "los_positive": values["los_positive"],
+        "nodata_policy": values["nodata_policy"],
+        "deformation_nodata": _parse_optional_number(values, "deformation_nodata"),
+        "height_nodata": _parse_optional_number(values, "height_nodata"),
+        "spatial_reference": values["spatial_reference"],
         "temporal_reference": temporal_reference,
         "temporal_reference_date": values.get("temporal_reference_date"),
         "source_temporal_reference": values.get("source_temporal_reference"),

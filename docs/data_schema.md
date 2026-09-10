@@ -78,6 +78,17 @@ LOS 正号、nodata 语义、时间参考模式和像元注册方式必须在 cf
 `preserve` 不改变 `/cum`，并记录显式来源参考说明；`date` 按行块减去指定时期，
 并将该日期记录为输出时间参考。
 
+The Phase 3C GAMMA converter accepts only regular geocoded longitude/latitude
+grids. It validates every headerless binary size from explicit per-role dtype
+and byte order, then reads deformation, DEM, and mask through row-sliced
+`memmap`. A configured finite deformation or DEM sentinel is converted to NaN
+and recorded. Temporal `preserve` and `date` modes match the LiCSBAS contract.
+
+第三阶段 C 的 GAMMA 转换器仅接受规则地理编码经纬网格。程序根据分别显式填写
+的 dtype 和字节序检查每个无文件头二进制文件大小，再通过按行 `memmap` 读取
+形变、DEM 与 mask。显式配置的有限形变或 DEM 哨兵值会转换为 NaN 并记录。
+时间 `preserve` 与 `date` 模式和 LiCSBAS 契约一致。
+
 ## 3. Sparse PS/DS Point Time Series / 稀疏 PS/DS 点时序
 
 Schema identifier: `insar_point_timeseries/1.0`.

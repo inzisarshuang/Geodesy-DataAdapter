@@ -1,6 +1,7 @@
 """Source-to-canonical conversion entry points."""
 
+from .gamma import convert_gamma_grid
 from .licsbas import convert_licsbas_grid
 from .mintpy import convert_mintpy_grid
 
-__all__ = ["convert_licsbas_grid", "convert_mintpy_grid"]
+__all__ = ["convert_gamma_grid", "convert_licsbas_grid", "convert_mintpy_grid"]

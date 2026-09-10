@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "insar-data-adapter"
-version = "0.4.0"
+version = "0.5.0"
 description = "Validated, bounded-memory adapters for InSAR time-series products"
 readme = "README.md"
 requires-python = ">=3.10"

@@ -1,8 +1,8 @@
 # InSAR-Data-Adapter
 
-InSAR-Data-Adapter is the data-contract layer between scientific processing systems such as GAMMA, MintPy, LiCSBAS, and future PS/DS-InSAR workflows and consumers such as PyGMT-Plotter. Phase 1 provides read-only source inspection, Phase 2 adds bounded-memory canonical grid HDF5 I/O, and Phases 3A–3B add strict MintPy and LiCSBAS grid conversion.
+InSAR-Data-Adapter is the data-contract layer between scientific processing systems such as GAMMA, MintPy, LiCSBAS, and future PS/DS-InSAR workflows and consumers such as PyGMT-Plotter. Phase 1 provides read-only source inspection, Phase 2 adds bounded-memory canonical grid HDF5 I/O, and Phases 3A–3C add strict MintPy, LiCSBAS, and geocoded GAMMA grid conversion.
 
-InSAR-Data-Adapter 是 GAMMA、MintPy、LiCSBAS、后续 PS/DS-InSAR 等科学处理系统与 PyGMT-Plotter 等消费端之间的数据契约层。第一阶段提供来源只读检查，第二阶段增加受控内存的标准规则栅格 HDF5 读写，第三阶段 A–B 增加严格的 MintPy 与 LiCSBAS 规则栅格转换。
+InSAR-Data-Adapter 是 GAMMA、MintPy、LiCSBAS、后续 PS/DS-InSAR 等科学处理系统与 PyGMT-Plotter 等消费端之间的数据契约层。第一阶段提供来源只读检查，第二阶段增加受控内存的标准规则栅格 HDF5 读写，第三阶段 A–C 增加严格的 MintPy、LiCSBAS 与地理编码 GAMMA 规则栅格转换。
 
 ## 1. Responsibilities / 职责
 
@@ -11,9 +11,9 @@ InSAR-Data-Adapter 是 GAMMA、MintPy、LiCSBAS、后续 PS/DS-InSAR 等科学�
 - Validate time dimensions, spatial dimensions, date vectors, units, and source-format expectations.<br>校验时间维、空间维、日期向量、单位和预期源格式。
 - Define separate canonical layouts for dense grids and sparse PS/DS points.<br>分别定义规则栅格与稀疏 PS/DS 点的标准布局。
 
-GAMMA memmap input, PS/DS point writing, Defsour/GRD/GeoTIFF exporters, and PyGMT integration are intentionally deferred to later phases.
+Radar-coordinate GAMMA input, PS/DS point writing, Defsour/GRD/GeoTIFF exporters, and PyGMT integration are intentionally deferred to later phases.
 
-GAMMA memmap 输入、PS/DS 点写入、Defsour/GRD/GeoTIFF 导出及 PyGMT 接入明确留到后续阶段。
+雷达坐标 GAMMA 输入、PS/DS 点写入、Defsour/GRD/GeoTIFF 导出及 PyGMT 接入明确留到后续阶段。
 
 ## 2. Installation / 安装
 
@@ -58,7 +58,17 @@ LiCSBAS 累积形变、DEM、mask、像元中心坐标和空间参考区从同�
 insar-adapter convert-licsbas --config config_examples/licsbas_to_canonical.cfg
 ```
 
-## 7. Canonical Grid API / 标准栅格 API
+## 7. GAMMA Geocoded Grid Conversion / GAMMA 地理编码规则栅格转换
+
+The first GAMMA adapter accepts a `tab` of headerless deformation files, a separate one-date-per-line manifest, a real DEM, an explicit mask, and a `.par` containing a regular longitude/latitude grid. Every dtype and byte order is explicit. Binary sizes are checked before conversion and data are read through row-sliced `memmap` slices. Radar-coordinate or curvilinear inputs must be geocoded first.
+
+首版 GAMMA adapter 接受无文件头形变文件 `tab`、逐行日期清单、真实 DEM、显式 mask，以及包含规则经纬网格的 `.par`。每种 dtype 与字节序均显式填写；转换前检查所有二进制文件大小，数据通过 `memmap` 行切片读取。雷达坐标或曲线网格输入必须先完成地理编码。
+
+```bash
+insar-adapter convert-gamma --config config_examples/gamma_to_canonical.cfg
+```
+
+## 8. Canonical Grid API / 标准栅格 API
 
 Writers accept complete epochs for moderate grids or full-column row blocks for large grids. Required geometry follows the same row-block pattern. The destination appears only after every epoch row and geometry row has been written and validated.
 
@@ -91,7 +101,7 @@ The example uses complete arrays only for readability. Production source adapter
 
 示例为便于阅读使用完整数组；正式来源 Adapter 将使用受控行块反复调用 `write_deformation_rows` 和 `write_geometry_rows`。
 
-## 8. Verification / 验证
+## 9. Verification / 验证
 
 ```bash
 python -m compileall -q src tests

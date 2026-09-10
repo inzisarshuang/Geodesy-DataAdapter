@@ -3,7 +3,8 @@ cli
 ===
 
 功能概述:
-    提供 cfg 驱动的 inspect、validate、MintPy 和 LiCSBAS 规则栅格转换命令。
+    提供 cfg 驱动的 inspect、validate、MintPy、LiCSBAS 和 GAMMA
+    规则栅格转换命令。
 
 函数说明:
     ``build_parser``:
@@ -18,11 +19,12 @@ import argparse
 import json
 
 from .config import (
+    load_gamma_conversion_config,
     load_inspect_config,
     load_licsbas_conversion_config,
     load_mintpy_conversion_config,
 )
-from .converters import convert_licsbas_grid, convert_mintpy_grid
+from .converters import convert_gamma_grid, convert_licsbas_grid, convert_mintpy_grid
 from .hdf5 import inspect_hdf5
 
 
@@ -37,6 +39,8 @@ def build_parser() -> argparse.ArgumentParser:
     convert_mintpy.add_argument("--config", required=True)
     convert_licsbas = subparsers.add_parser("convert-licsbas")
     convert_licsbas.add_argument("--config", required=True)
+    convert_gamma = subparsers.add_parser("convert-gamma")
+    convert_gamma.add_argument("--config", required=True)
     return parser
 
 
@@ -49,6 +53,10 @@ def main() -> None:
         return
     if arguments.command == "convert-licsbas":
         output = convert_licsbas_grid(load_licsbas_conversion_config(arguments.config))
+        print(f"WROTE: {output}")
+        return
+    if arguments.command == "convert-gamma":
+        output = convert_gamma_grid(load_gamma_conversion_config(arguments.config))
         print(f"WROTE: {output}")
         return
     config = load_inspect_config(arguments.config)
