@@ -62,6 +62,22 @@ without re-referencing the data.
 单位原样复制形变，并要求显式 DEM 与静态掩膜输入。程序记录 MintPy 的
 `REF_DATE`、`REF_Y` 和 `REF_X`，但不重新参考数据。
 
+The Phase 3B LiCSBAS converter preserves `corner_lon/corner_lat` as first pixel
+centres and copies `/cum`, `/hgt`, and the finite-positive interpretation of
+`/mask` by row block. `/refarea` is recorded as the spatial reference. Units,
+EPSG:4326, LOS sign, nodata semantics, temporal-reference mode, and pixel
+registration must be explicit in cfg because they may be absent from the HDF5.
+`preserve` records an explicit source-reference description without changing
+`/cum`; `date` subtracts one requested epoch by row block and records that date
+as the output reference.
+
+第三阶段 B 的 LiCSBAS 转换器将 `corner_lon/corner_lat` 保留为首像元中心，
+按行块复制 `/cum`、`/hgt`，并将 `/mask` 中有限且大于零的值解释为有效。
+`/refarea` 记录为空间参考。由于这些信息可能不在 HDF5 中，单位、EPSG:4326、
+LOS 正号、nodata 语义、时间参考模式和像元注册方式必须在 cfg 中显式填写。
+`preserve` 不改变 `/cum`，并记录显式来源参考说明；`date` 按行块减去指定时期，
+并将该日期记录为输出时间参考。
+
 ## 3. Sparse PS/DS Point Time Series / 稀疏 PS/DS 点时序
 
 Schema identifier: `insar_point_timeseries/1.0`.

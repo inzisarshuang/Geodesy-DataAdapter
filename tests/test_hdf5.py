@@ -77,16 +77,24 @@ class HDF5InspectionTests(unittest.TestCase):
         self.assertEqual(summary.layout, "grid")
 
     def test_inspects_licsbas_signature(self) -> None:
-        """Recognize LiCSBAS and apply its documented millimetre unit."""
+        """Recognize LiCSBAS but do not invent missing unit or CRS metadata."""
         source = self.root / "licsbas.h5"
         with h5py.File(source, "w") as handle:
             handle.create_dataset("cum", shape=(2, 3, 4), dtype="float32")
             handle.create_dataset("imdates", data=[20200101, 20200113])
             handle.create_dataset("hgt", shape=(3, 4), dtype="float32")
             handle.create_dataset("mask", shape=(3, 4), dtype="uint8")
-        summary = inspect_hdf5(source, expected_format="licsbas")
-        self.assertEqual(summary.deformation_unit, "mm")
-        self.assertEqual(summary.crs, "EPSG:4326")
+            handle.create_dataset(
+                "refarea", data="1:2/1:2", dtype=h5py.string_dtype("utf-8")
+            )
+        with self.assertRaisesRegex(ValueError, "unit is missing"):
+            inspect_hdf5(source, expected_format="licsbas")
+        summary = inspect_hdf5(
+            source, expected_format="licsbas", require_unit=False
+        )
+        self.assertIsNone(summary.deformation_unit)
+        self.assertIsNone(summary.crs)
+        self.assertIsNone(summary.temporal_reference)
 
     def test_rejects_dimension_mismatch_and_wrong_expected_format(self) -> None:
         """Fail early for inconsistent time dimensions and format expectations."""

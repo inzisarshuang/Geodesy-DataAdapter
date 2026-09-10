@@ -195,9 +195,11 @@ def inspect_hdf5(
         elif source_format == "licsbas":
             displacement = handle["cum"]
             dates = _dates(handle["imdates"])
-            unit = _attribute(displacement.attrs, "UNIT", "unit") or "mm"
-            crs = _normalize_crs(_attribute(handle.attrs, "crs")) or "EPSG:4326"
-            reference = _attribute(handle.attrs, "refarea", "temporal_reference")
+            unit = _attribute(displacement.attrs, "UNIT", "unit") or _attribute(
+                handle.attrs, "UNIT", "unit"
+            )
+            crs = _normalize_crs(_attribute(handle.attrs, "CRS", "crs", "EPSG"))
+            reference = _attribute(handle.attrs, "temporal_reference")
             layout = "grid"
             dataset_name = "/cum"
         else:

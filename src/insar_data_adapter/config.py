@@ -3,13 +3,15 @@ config
 ======
 
 功能概述:
-    严格解析检查及 MintPy 转换 cfg，并按 cfg 目录解析路径。
+    严格解析检查、MintPy 及 LiCSBAS 转换 cfg，并按 cfg 目录解析路径。
 
 函数说明:
     ``load_inspect_config``:
         读取并校验 input_file、input_type 和 require_unit。
     ``load_mintpy_conversion_config``:
         读取 MintPy 到标准栅格 HDF5 的显式转换参数。
+    ``load_licsbas_conversion_config``:
+        读取 LiCSBAS 到标准栅格 HDF5 的显式转换参数。
 """
 
 from __future__ import annotations
@@ -30,6 +32,28 @@ _MINTPY_CONVERSION_KEYS = {
     "los_positive",
     "nodata_policy",
     "height_unit",
+    "chunk_rows",
+    "compression",
+    "compression_level",
+    "overwrite",
+}
+
+_LICSBAS_CONVERSION_KEYS = {
+    "input_file",
+    "output_file",
+    "deformation_dataset",
+    "date_dataset",
+    "height_dataset",
+    "mask_dataset",
+    "deformation_unit",
+    "height_unit",
+    "crs",
+    "los_positive",
+    "nodata_policy",
+    "temporal_reference",
+    "temporal_reference_date",
+    "source_temporal_reference",
+    "grid_registration",
     "chunk_rows",
     "compression",
     "compression_level",
@@ -140,6 +164,66 @@ def load_mintpy_conversion_config(config_file: str | Path) -> dict[str, object]:
         "los_positive": values["los_positive"],
         "nodata_policy": values["nodata_policy"],
         "height_unit": values["height_unit"],
+        "chunk_rows": _parse_integer(values.get("chunk_rows", "256"), "chunk_rows", 1),
+        "compression": None if compression == "none" else compression,
+        "compression_level": _parse_integer(
+            values.get("compression_level", "4"), "compression_level", 0, 9
+        ),
+        "overwrite": _parse_bool(values.get("overwrite", "false"), "overwrite"),
+    }
+
+
+def load_licsbas_conversion_config(config_file: str | Path) -> dict[str, object]:
+    """Load strict LiCSBAS grid conversion settings without inferring science metadata."""
+    path = Path(config_file).expanduser().resolve()
+    values = _read_strict_config(path, _LICSBAS_CONVERSION_KEYS)
+    required = {
+        "input_file",
+        "output_file",
+        "deformation_unit",
+        "height_unit",
+        "crs",
+        "los_positive",
+        "nodata_policy",
+        "temporal_reference",
+        "grid_registration",
+    }
+    missing = sorted(required.difference(values))
+    if missing:
+        raise ValueError(f"required LiCSBAS conversion cfg keys are missing: {missing}")
+    registration = values["grid_registration"].lower()
+    if registration != "pixel":
+        raise ValueError("LiCSBAS corner coordinates require grid_registration = pixel")
+    temporal_reference = values["temporal_reference"].lower()
+    if temporal_reference not in {"preserve", "date"}:
+        raise ValueError("temporal_reference must be preserve or date")
+    if temporal_reference == "preserve" and "source_temporal_reference" not in values:
+        raise ValueError(
+            "source_temporal_reference is required when temporal_reference = preserve"
+        )
+    if temporal_reference == "date" and "temporal_reference_date" not in values:
+        raise ValueError(
+            "temporal_reference_date is required when temporal_reference = date"
+        )
+    compression = values.get("compression", "gzip").lower()
+    if compression not in {"none", "gzip", "lzf"}:
+        raise ValueError("compression must be none, gzip, or lzf")
+    return {
+        "input_file": _resolve_path(values["input_file"], path),
+        "output_file": _resolve_path(values["output_file"], path),
+        "deformation_dataset": values.get("deformation_dataset", "cum"),
+        "date_dataset": values.get("date_dataset", "imdates"),
+        "height_dataset": values.get("height_dataset", "hgt"),
+        "mask_dataset": values.get("mask_dataset", "mask"),
+        "deformation_unit": values["deformation_unit"],
+        "height_unit": values["height_unit"],
+        "crs": values["crs"],
+        "los_positive": values["los_positive"],
+        "nodata_policy": values["nodata_policy"],
+        "temporal_reference": temporal_reference,
+        "temporal_reference_date": values.get("temporal_reference_date"),
+        "source_temporal_reference": values.get("source_temporal_reference"),
+        "grid_registration": registration,
         "chunk_rows": _parse_integer(values.get("chunk_rows", "256"), "chunk_rows", 1),
         "compression": None if compression == "none" else compression,
         "compression_level": _parse_integer(

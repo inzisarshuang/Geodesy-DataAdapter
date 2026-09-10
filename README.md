@@ -1,8 +1,8 @@
 # InSAR-Data-Adapter
 
-InSAR-Data-Adapter is the data-contract layer between scientific processing systems such as GAMMA, MintPy, and future PS/DS-InSAR workflows and consumers such as PyGMT-Plotter. Phase 1 provides read-only source inspection, Phase 2 adds bounded-memory canonical grid HDF5 I/O, and Phase 3A adds strict MintPy grid conversion.
+InSAR-Data-Adapter is the data-contract layer between scientific processing systems such as GAMMA, MintPy, LiCSBAS, and future PS/DS-InSAR workflows and consumers such as PyGMT-Plotter. Phase 1 provides read-only source inspection, Phase 2 adds bounded-memory canonical grid HDF5 I/O, and Phases 3A–3B add strict MintPy and LiCSBAS grid conversion.
 
-InSAR-Data-Adapter 是 GAMMA、MintPy、后续 PS/DS-InSAR 等科学处理系统与 PyGMT-Plotter 等消费端之间的数据契约层。第一阶段提供来源只读检查，第二阶段增加受控内存的标准规则栅格 HDF5 读写，第三阶段 A 增加严格的 MintPy 规则栅格转换。
+InSAR-Data-Adapter 是 GAMMA、MintPy、LiCSBAS、后续 PS/DS-InSAR 等科学处理系统与 PyGMT-Plotter 等消费端之间的数据契约层。第一阶段提供来源只读检查，第二阶段增加受控内存的标准规则栅格 HDF5 读写，第三阶段 A–B 增加严格的 MintPy 与 LiCSBAS 规则栅格转换。
 
 ## 1. Responsibilities / 职责
 
@@ -11,9 +11,9 @@ InSAR-Data-Adapter 是 GAMMA、MintPy、后续 PS/DS-InSAR 等科学处理系统
 - Validate time dimensions, spatial dimensions, date vectors, units, and source-format expectations.<br>校验时间维、空间维、日期向量、单位和预期源格式。
 - Define separate canonical layouts for dense grids and sparse PS/DS points.<br>分别定义规则栅格与稀疏 PS/DS 点的标准布局。
 
-GAMMA memmap input, LiCSBAS conversion, PS/DS point writing, Defsour/GRD/GeoTIFF exporters, and PyGMT integration are intentionally deferred to later phases.
+GAMMA memmap input, PS/DS point writing, Defsour/GRD/GeoTIFF exporters, and PyGMT integration are intentionally deferred to later phases.
 
-GAMMA memmap 输入、LiCSBAS 转换、PS/DS 点写入、Defsour/GRD/GeoTIFF 导出及 PyGMT 接入明确留到后续阶段。
+GAMMA memmap 输入、PS/DS 点写入、Defsour/GRD/GeoTIFF 导出及 PyGMT 接入明确留到后续阶段。
 
 ## 2. Installation / 安装
 
@@ -48,7 +48,17 @@ The converter reads `/timeseries` by epoch and row block. It copies deformation 
 insar-adapter convert-mintpy --config config_examples/mintpy_to_canonical.cfg
 ```
 
-## 6. Canonical Grid API / 标准栅格 API
+## 6. LiCSBAS Grid Conversion / LiCSBAS 规则栅格转换
+
+LiCSBAS cumulative deformation, DEM, mask, pixel-centre coordinates, and spatial reference area are read from one HDF5 file by row block. Because many LiCSBAS files do not declare scientific conventions as HDF5 attributes, deformation/height units, CRS, LOS sign, nodata policy, temporal-reference mode, and pixel registration are mandatory cfg values. Temporal values may either be preserved with an explicit source-reference description or re-referenced by subtracting one configured date.
+
+LiCSBAS 累积形变、DEM、mask、像元中心坐标和空间参考区从同一 HDF5 中按行块读取。由于许多 LiCSBAS 文件没有用 HDF5 属性声明科学约定，cfg 必须填写形变/高程单位、CRS、LOS 正号、nodata 规则、时间参考模式和像元注册方式。时间值既可原样保留并显式说明来源参考，也可通过减去 cfg 指定日期重新参考。
+
+```bash
+insar-adapter convert-licsbas --config config_examples/licsbas_to_canonical.cfg
+```
+
+## 7. Canonical Grid API / 标准栅格 API
 
 Writers accept complete epochs for moderate grids or full-column row blocks for large grids. Required geometry follows the same row-block pattern. The destination appears only after every epoch row and geometry row has been written and validated.
 
@@ -81,7 +91,7 @@ The example uses complete arrays only for readability. Production source adapter
 
 示例为便于阅读使用完整数组；正式来源 Adapter 将使用受控行块反复调用 `write_deformation_rows` 和 `write_geometry_rows`。
 
-## 7. Verification / 验证
+## 8. Verification / 验证
 
 ```bash
 python -m compileall -q src tests
