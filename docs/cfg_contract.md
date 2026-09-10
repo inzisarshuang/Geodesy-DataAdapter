@@ -110,3 +110,16 @@ Coordinates are preserved without scaling, reprojection, or resampling. In `pres
 Relative paths inside `tab_file` resolve from the tab directory. The adapter rejects duplicate paths/dates, mismatched manifest lengths, wrong byte counts, false grid registration, CRS conflicts, and non-rectilinear parameter files before publishing output. Radar-coordinate data and optional reprojection remain outside Phase 3C.
 
 `tab_file` 内的相对路径以 tab 所在目录解析。发布输出前，adapter 会拒绝重复路径/日期、清单长度不一致、错误字节数、虚假网格注册、CRS 冲突以及非规则网格参数文件。雷达坐标数据与可选重投影不属于第三阶段 C。
+
+## 6. Canonical Point API and Future CFG / 标准点 API 与后续 CFG
+
+Phase 4A exposes a source-neutral Python API, not a conversion command, because
+no PSI_WWQ/PSI_ZDN source contract has yet been selected. Consequently it adds
+no cfg keys. Phase 4B will first inspect those source products, document every
+unit, sign, reference, nodata, identity, coordinate, and quality-field mapping,
+and only then add a strict source-specific cfg and conversion command.
+
+第四阶段 A 只提供与来源无关的 Python API，不提供转换命令，因为尚未确定
+PSI_WWQ/PSI_ZDN 的来源契约，所以本阶段不增加 cfg 参数。第四阶段 B 将先检查
+这些来源产品，明确记录单位、正负号、参考、nodata、点标识、坐标及质量字段的
+每一项映射，再增加严格的来源 cfg 与转换命令。

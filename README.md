@@ -1,8 +1,8 @@
 # InSAR-Data-Adapter
 
-InSAR-Data-Adapter is the data-contract layer between scientific processing systems such as GAMMA, MintPy, LiCSBAS, and future PS/DS-InSAR workflows and consumers such as PyGMT-Plotter. Phase 1 provides read-only source inspection, Phase 2 adds bounded-memory canonical grid HDF5 I/O, and Phases 3A–3C add strict MintPy, LiCSBAS, and geocoded GAMMA grid conversion.
+InSAR-Data-Adapter is the data-contract layer between scientific processing systems such as GAMMA, MintPy, LiCSBAS, and future PS/DS-InSAR workflows and consumers such as PyGMT-Plotter. Phase 1 provides read-only source inspection, Phase 2 adds bounded-memory canonical grid HDF5 I/O, Phases 3A–3C add strict MintPy, LiCSBAS, and geocoded GAMMA grid conversion, and Phase 4A adds source-neutral PS/DS point HDF5 I/O.
 
-InSAR-Data-Adapter 是 GAMMA、MintPy、LiCSBAS、后续 PS/DS-InSAR 等科学处理系统与 PyGMT-Plotter 等消费端之间的数据契约层。第一阶段提供来源只读检查，第二阶段增加受控内存的标准规则栅格 HDF5 读写，第三阶段 A–C 增加严格的 MintPy、LiCSBAS 与地理编码 GAMMA 规则栅格转换。
+InSAR-Data-Adapter 是 GAMMA、MintPy、LiCSBAS、后续 PS/DS-InSAR 等科学处理系统与 PyGMT-Plotter 等消费端之间的数据契约层。第一阶段提供来源只读检查，第二阶段增加受控内存的标准规则栅格 HDF5 读写，第三阶段 A–C 增加严格的 MintPy、LiCSBAS 与地理编码 GAMMA 规则栅格转换，第四阶段 A 增加与来源无关的 PS/DS 点 HDF5 读写。
 
 ## 1. Responsibilities / 职责
 
@@ -11,9 +11,9 @@ InSAR-Data-Adapter 是 GAMMA、MintPy、LiCSBAS、后续 PS/DS-InSAR 等科学�
 - Validate time dimensions, spatial dimensions, date vectors, units, and source-format expectations.<br>校验时间维、空间维、日期向量、单位和预期源格式。
 - Define separate canonical layouts for dense grids and sparse PS/DS points.<br>分别定义规则栅格与稀疏 PS/DS 点的标准布局。
 
-Radar-coordinate GAMMA input, PS/DS point writing, Defsour/GRD/GeoTIFF exporters, and PyGMT integration are intentionally deferred to later phases.
+Radar-coordinate GAMMA input, source-specific PS/DS ingestion, Defsour/GRD/GeoTIFF exporters, and PyGMT integration are intentionally deferred to later phases.
 
-雷达坐标 GAMMA 输入、PS/DS 点写入、Defsour/GRD/GeoTIFF 导出及 PyGMT 接入明确留到后续阶段。
+雷达坐标 GAMMA 输入、特定来源的 PS/DS 接入、Defsour/GRD/GeoTIFF 导出及 PyGMT 接入明确留到后续阶段。
 
 ## 2. Installation / 安装
 
@@ -101,7 +101,75 @@ The example uses complete arrays only for readability. Production source adapter
 
 示例为便于阅读使用完整数组；正式来源 Adapter 将使用受控行块反复调用 `write_deformation_rows` 和 `write_geometry_rows`。
 
-## 9. Verification / 验证
+## 9. Canonical PS/DS Point API / 标准 PS/DS 点 API
+
+`CanonicalPointWriter` writes static point fields in sequential point blocks and
+each deformation epoch independently in sequential point blocks. Optional
+quality datasets must be declared before writing with their dimensions, dtype,
+unit, description, and nodata policy. `CanonicalPointReader` always requires an
+explicit point range, preventing accidental full reads of very large point sets.
+
+`CanonicalPointWriter` 按连续点块写入静态点字段，并对每个形变时期独立按连续
+点块写入。可选质量字段必须在写入前声明其维度、dtype、单位、说明和 nodata
+规则。`CanonicalPointReader` 始终要求显式点范围，避免意外读取超大点集。
+
+```python
+from insar_data_adapter import (
+    CanonicalPointWriter,
+    PointMetadata,
+    PointQualitySpec,
+)
+
+quality = PointQualitySpec(
+    name="temporal_coherence",
+    temporal=False,
+    dtype="float32",
+    unit="1",
+    description="Temporal coherence per point",
+    nodata_policy="NaN is nodata",
+)
+metadata = PointMetadata(
+    source_format="custom_psds",
+    deformation_unit="mm",
+    deformation_quantity="cumulative_displacement",
+    los_positive="toward_satellite",
+    crs="EPSG:32628",
+    nodata_policy="NaN is nodata; zero is valid",
+    temporal_reference="20200101",
+    spatial_reference="point_id=10",
+    source_provenance="manifest.json",
+    height_unit="m",
+)
+
+with CanonicalPointWriter(
+    "psds_timeseries.h5",
+    dates,
+    point_count,
+    metadata,
+    quality_specs=(quality,),
+) as writer:
+    for start, stop in point_blocks:
+        writer.write_points(
+            start,
+            point_id[start:stop],
+            x[start:stop],
+            y[start:stop],
+            height[start:stop],
+            quality={"temporal_coherence": coherence[start:stop]},
+        )
+    for epoch in range(len(dates)):
+        for start, stop in point_blocks:
+            writer.write_deformation_points(
+                epoch, start, displacement[epoch, start:stop]
+            )
+```
+
+The complete PSI_WWQ/PSI_ZDN source mapping and cfg are intentionally assigned
+to Phase 4B after read-only source inspection.
+
+完整的 PSI_WWQ/PSI_ZDN 来源映射与 cfg 将在只读检查来源后于第四阶段 B 实现。
+
+## 10. Verification / 验证
 
 ```bash
 python -m compileall -q src tests

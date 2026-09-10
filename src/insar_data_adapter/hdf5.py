@@ -17,11 +17,17 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+import re
 from typing import Any
 
 import h5py
+import numpy as np
 
 from .model import DatasetSummary
+
+
+_POINT_VALIDATION_BLOCK = 262144
+_POINT_FIELD_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 
 
 def _text(value: Any) -> str:
@@ -52,6 +58,141 @@ def _normalize_crs(value: str | None) -> str | None:
         return None
     normalized = value.strip()
     return f"EPSG:{normalized}" if normalized.isdigit() else normalized
+
+
+def _point_blocks(dataset: h5py.Dataset):
+    """Yield bounded one-dimensional blocks for point-level validation."""
+    for start in range(0, len(dataset), _POINT_VALIDATION_BLOCK):
+        yield dataset[start : min(start + _POINT_VALIDATION_BLOCK, len(dataset))]
+
+
+def _validate_point_ids(dataset: h5py.Dataset) -> None:
+    """Check non-negative, globally increasing integer identities by bounded blocks."""
+    if (
+        dataset.ndim != 1
+        or dataset.dtype.kind != "i"
+        or dataset.dtype.itemsize != 8
+    ):
+        raise ValueError(
+            "canonical points/point_id must be a one-dimensional signed-int64 dataset"
+        )
+    previous: int | None = None
+    for values in _point_blocks(dataset):
+        if values.size == 0:
+            continue
+        if np.any(values < 0):
+            raise ValueError("canonical point_id values must be non-negative")
+        if np.any(values[1:] <= values[:-1]):
+            raise ValueError("canonical point_id values must be strictly increasing")
+        if previous is not None and int(values[0]) <= previous:
+            raise ValueError("canonical point_id values must be strictly increasing")
+        previous = int(values[-1])
+
+
+def _validate_finite_point_field(dataset: h5py.Dataset, name: str) -> None:
+    """Require a numeric point coordinate field containing only finite values."""
+    if dataset.dtype.kind not in {"f", "i", "u"}:
+        raise ValueError(f"canonical points/{name} must use a real numeric dtype")
+    for values in _point_blocks(dataset):
+        if not np.isfinite(values).all():
+            raise ValueError(f"canonical points/{name} must contain only finite values")
+
+
+def _validate_point_layout(
+    handle: h5py.File, displacement: h5py.Dataset, time_count: int
+) -> None:
+    """Validate canonical sparse-point fields without loading complete point arrays."""
+    if displacement.ndim != 2:
+        raise ValueError("canonical point displacement must be [time, point]")
+    if displacement.dtype.kind not in {"f", "i", "u"}:
+        raise ValueError("canonical point displacement must use a real numeric dtype")
+    if displacement.chunks is None or displacement.chunks[0] != 1:
+        raise ValueError("canonical point displacement must use one-epoch chunks")
+    point_count = displacement.shape[1]
+    if point_count < 1:
+        raise ValueError("canonical point time series must contain at least one point")
+    for name in ("point_id", "x", "y", "height"):
+        dataset = handle[f"points/{name}"]
+        if dataset.shape != (point_count,):
+            raise ValueError(f"canonical points/{name} length is inconsistent")
+        if dataset.chunks is None:
+            raise ValueError(f"canonical points/{name} must be chunked")
+    _validate_point_ids(handle["points/point_id"])
+    for name in ("x", "y", "height"):
+        _validate_finite_point_field(handle[f"points/{name}"], name)
+
+    has_row = "points/row" in handle
+    has_column = "points/column" in handle
+    if has_row != has_column:
+        raise ValueError("canonical points/row and points/column must occur together")
+    if has_row:
+        for name in ("row", "column"):
+            dataset = handle[f"points/{name}"]
+            if dataset.shape != (point_count,) or dataset.dtype.kind not in {"i", "u"}:
+                raise ValueError(
+                    f"canonical points/{name} must be a point-length integer dataset"
+                )
+            if dataset.chunks is None:
+                raise ValueError(f"canonical points/{name} must be chunked")
+            if _attribute(dataset.attrs, "index_origin") != "zero_based":
+                raise ValueError(
+                    f"canonical points/{name} index_origin must be zero_based"
+                )
+            for values in _point_blocks(dataset):
+                if np.any(values < 0):
+                    raise ValueError(f"canonical points/{name} must be non-negative")
+
+    if "points/velocity" in handle:
+        velocity = handle["points/velocity"]
+        if velocity.shape != (point_count,) or velocity.dtype.kind not in {"f", "i", "u"}:
+            raise ValueError("canonical points/velocity must be a point-length numeric dataset")
+        if velocity.chunks is None:
+            raise ValueError("canonical points/velocity must be chunked")
+        for attribute in ("unit", "description", "nodata_policy", "dimensions"):
+            if attribute not in velocity.attrs or not _text(
+                velocity.attrs[attribute]
+            ).strip():
+                raise ValueError(
+                    f"canonical points/velocity attribute {attribute} must not be blank"
+                )
+        if _text(velocity.attrs["dimensions"]) != "point":
+            raise ValueError("canonical points/velocity dimensions must be point")
+
+    if "quality" not in handle:
+        return
+    quality = handle["quality"]
+    if not isinstance(quality, h5py.Group):
+        raise ValueError("canonical quality must be an HDF5 group")
+    for name, dataset in quality.items():
+        if _POINT_FIELD_PATTERN.fullmatch(name) is None:
+            raise ValueError(f"invalid canonical quality field name: {name!r}")
+        if not isinstance(dataset, h5py.Dataset):
+            raise ValueError(f"canonical quality/{name} must be a dataset")
+        if dataset.shape == (point_count,):
+            expected_dimensions = "point"
+        elif dataset.shape == (time_count, point_count):
+            expected_dimensions = "time,point"
+            if dataset.chunks is None or dataset.chunks[0] != 1:
+                raise ValueError(
+                    f"canonical temporal quality/{name} must use one-epoch chunks"
+                )
+        else:
+            raise ValueError(
+                f"canonical quality/{name} must be [point] or [time, point]"
+            )
+        if dataset.chunks is None:
+            raise ValueError(f"canonical quality/{name} must be chunked")
+        if dataset.dtype.kind not in {"f", "i", "u"}:
+            raise ValueError(f"canonical quality/{name} must use a real numeric dtype")
+        for attribute in ("unit", "description", "nodata_policy", "dimensions"):
+            if attribute not in dataset.attrs or not _text(dataset.attrs[attribute]).strip():
+                raise ValueError(
+                    f"canonical quality/{name} attribute {attribute} must not be blank"
+                )
+        if _text(dataset.attrs["dimensions"]) != expected_dimensions:
+            raise ValueError(
+                f"canonical quality/{name} dimensions must be {expected_dimensions}"
+            )
 
 
 def _validate_canonical(handle: h5py.File, schema: str) -> None:
@@ -110,6 +251,8 @@ def _validate_canonical(handle: h5py.File, schema: str) -> None:
         raise ValueError("canonical displacement dataset must be chunked")
     if dates.ndim != 1 or epoch_ids.ndim != 1:
         raise ValueError("canonical date and epoch_id datasets must be one-dimensional")
+    if epoch_ids.dtype.kind not in {"i", "u"}:
+        raise ValueError("canonical epoch_id dataset must use an integer dtype")
     if len(dates) != len(epoch_ids) or displacement.shape[0] != len(dates):
         raise ValueError("canonical time dimensions are inconsistent")
     epoch_values = epoch_ids[...].tolist()
@@ -138,12 +281,7 @@ def _validate_canonical(handle: h5py.File, schema: str) -> None:
         ):
             raise ValueError("canonical longitude/latitude shapes do not match displacement")
     else:
-        if displacement.ndim != 2:
-            raise ValueError("canonical point displacement must be [time, point]")
-        point_count = displacement.shape[1]
-        for name in ("point_id", "x", "y", "height"):
-            if handle[f"points/{name}"].shape != (point_count,):
-                raise ValueError(f"canonical points/{name} length is inconsistent")
+        _validate_point_layout(handle, displacement, len(dates))
 
 
 def detect_hdf5_format(path: str | Path) -> str:

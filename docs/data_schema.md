@@ -107,9 +107,47 @@ Schema identifier: `insar_point_timeseries/1.0`.
 /quality/*                   [point] or [time, point] optional
 ```
 
-`epoch_id` and `point_id` are unique identities. Dates may repeat only when distinct acquisitions are intentionally preserved. `row` and `column` allow lossless reconstruction of a source grid without interpolation.
+`point_id` is a non-negative signed-int64 identity stored in globally strictly
+increasing order. This ordering permits uniqueness validation by bounded point
+blocks instead of loading the entire identity vector. `x`, `y`, and `height`
+must be finite numeric values. `row` and `column` are optional non-negative
+integer zero-based fields, must occur together, and allow lossless reconstruction
+of a source grid without interpolation. `velocity` is optional; when present it
+must declare `unit`, `description`, `nodata_policy`, and `dimensions=point`
+instead of inheriting the cumulative-displacement unit.
 
-`epoch_id` 和 `point_id` 是唯一标识。只有确实保留不同观测时日期才允许重复；`row` 和 `column` 用于无插值恢复源栅格。
+`epoch_id` is a unique integer acquisition identity. Dates use `YYYYMMDD`; a
+repeated date is valid only when distinct acquisitions are intentionally retained.
+
+`point_id` 是非负 signed-int64 标识，且必须全局严格递增。借助这一顺序，可以按
+受控点块验证唯一性，而不必加载完整标识向量。`x`、`y` 和 `height` 必须是有限
+数值。可选的 `row` 与 `column` 必须同时存在且为非负零基整数，用于无插值恢复
+源栅格。`velocity` 为可选字段；存在时必须声明 `unit`、`description`、
+`nodata_policy` 和 `dimensions=point`，不能直接继承累计形变单位。
+
+`epoch_id` 是唯一的整数观测标识。日期采用 `YYYYMMDD`；只有明确保留不同观测时，
+才允许出现重复日期。
+
+Point-scale datasets are chunked. `/data/displacement` and time-varying quality
+fields use one epoch per chunk. Writers accept only sequential point blocks for
+the static fields and independently sequential blocks for each epoch, so
+completion tracking is O(time), not O(time×point). Readers require an explicit,
+non-empty half-open point range and never default to reading every point.
+
+点尺度数据集均采用分块存储。`/data/displacement` 与时变质量字段每块只包含一个
+时期。静态字段必须按连续点块顺序写入，每个时期也独立按连续点块顺序写入，因而
+完成度跟踪只需 O(time)，而非 O(time×point)。读取时必须显式指定非空的左闭右开
+点范围，接口不会默认读取全部点。
+
+Every `/quality/*` field is a flat, valid identifier and a real numeric dataset.
+Its shape is exactly `[point]` or `[time, point]`, and it must declare non-empty
+`unit`, `description`, `nodata_policy`, and `dimensions` attributes. The
+`dimensions` value is exactly `point` or `time,point` and must match its shape.
+
+每个 `/quality/*` 都必须使用扁平合法字段名和实数数值 dtype，其形状只能是
+`[point]` 或 `[time, point]`。字段必须显式填写非空的 `unit`、`description`、
+`nodata_policy` 与 `dimensions` 属性；`dimensions` 只能是与形状对应的 `point`
+或 `time,point`。
 
 ## 4. Non-Negotiable Conventions / 强制约定
 
