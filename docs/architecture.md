@@ -38,7 +38,7 @@ GAMMA / MintPy / PS-DS-InSAR
 2. Implement canonical grid HDF5 readers/writers with atomic, chunked output (complete).<br>实现标准规则栅格 HDF5 读写和原子分块输出（已完成）。
 3. Implement source adapters in bounded subphases: MintPy grid (3A complete), LiCSBAS grid (3B complete), and geocoded GAMMA memmap (3C complete).<br>按受控子阶段实现来源适配：MintPy 规则栅格（3A 已完成）、LiCSBAS 规则栅格（3B 已完成）及地理编码 GAMMA memmap（3C 已完成）。
 4. Implement PS/DS support in bounded subphases: canonical point HDF5 I/O (4A complete), then source-specific PSI_WWQ/PSI_ZDN adapters (4B).<br>按受控子阶段实现 PS/DS：标准点 HDF5 读写（4A 已完成），再实现 PSI_WWQ/PSI_ZDN 来源 adapter（4B）。
-5. Integrate PyGMT `scatter`, `grid`, and `auto` render modes.<br>接入 PyGMT 的 `scatter`、`grid` 和 `auto` 绘图模式。
+5. Integrate PyGMT in bounded subphases: expose consumer-safe grid axes and registration (5A complete), then connect and verify `scatter`, `grid`, and `auto` render modes (5B).<br>分阶段接入 PyGMT：先提供消费端安全使用的网格轴与注册方式（5A 已完成），再接入并验证 `scatter`、`grid` 和 `auto` 绘图模式（5B）。
 
 No phase should require a broad rewrite of an upstream processing repository.
 

@@ -389,6 +389,21 @@ class CanonicalGridReader:
             raise RuntimeError("reader is not active")
         return self._handle
 
+    @property
+    def grid_registration(self) -> str:
+        """Return the validated pixel or gridline registration of the active grid."""
+        value = self._require_handle().attrs["grid_registration"]
+        registration = value.decode("utf-8") if isinstance(value, bytes) else str(value)
+        if registration not in {"pixel", "gridline"}:
+            raise ValueError(f"unsupported canonical grid registration: {registration}")
+        return registration
+
+    def read_axis(self, name: str) -> np.ndarray:
+        """Read the complete one-dimensional X or Y coordinate axis."""
+        if name not in {"x", "y"}:
+            raise ValueError(f"unsupported coordinate axis: {name}")
+        return self._require_handle()[f"geometry/{name}"][...]
+
     def read_epoch(
         self, epoch_index: int, row_start: int = 0, row_stop: int | None = None
     ) -> np.ndarray:

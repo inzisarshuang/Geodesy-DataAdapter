@@ -46,6 +46,15 @@ must occur as a pair.
 `grid_registration` 可为 `pixel` 或 `gridline`；第二阶段写入器使用
 `pixel`。曲线网格的经纬度二维数组为可选项，且必须成对出现。
 
+Consumers read the one-dimensional axes through
+`CanonicalGridReader.read_axis("x" | "y")` and the registration through the
+read-only `grid_registration` property. Both interfaces require an active reader
+context; consumers must not access the private HDF5 handle.
+
+消费端通过 `CanonicalGridReader.read_axis("x" | "y")` 读取一维坐标轴，并通过
+只读 `grid_registration` 属性读取注册方式。两者都要求 reader 处于活动上下文；
+消费端不得访问私有 HDF5 handle。
+
 The displacement dataset must be chunked. Phase 2 writes one epoch per chunk
 and limits the row count so a float32 chunk remains near 1 MiB even when the
 configured row ceiling is larger.

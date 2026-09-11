@@ -1,8 +1,8 @@
 # InSAR-Data-Adapter
 
-InSAR-Data-Adapter is the data-contract layer between scientific processing systems such as GAMMA, MintPy, LiCSBAS, and future PS/DS-InSAR workflows and consumers such as PyGMT-Plotter. Phase 1 provides read-only source inspection, Phase 2 adds bounded-memory canonical grid HDF5 I/O, Phases 3A–3C add strict MintPy, LiCSBAS, and geocoded GAMMA grid conversion, and Phase 4A adds source-neutral PS/DS point HDF5 I/O.
+InSAR-Data-Adapter is the data-contract layer between scientific processing systems such as GAMMA, MintPy, LiCSBAS, and future PS/DS-InSAR workflows and consumers such as PyGMT-Plotter. Phase 1 provides read-only source inspection, Phase 2 adds bounded-memory canonical grid HDF5 I/O, Phases 3A–3C add strict MintPy, LiCSBAS, and geocoded GAMMA grid conversion, Phase 4A adds source-neutral PS/DS point HDF5 I/O, and Phase 5A exposes grid geometry safely to visualization consumers.
 
-InSAR-Data-Adapter 是 GAMMA、MintPy、LiCSBAS、后续 PS/DS-InSAR 等科学处理系统与 PyGMT-Plotter 等消费端之间的数据契约层。第一阶段提供来源只读检查，第二阶段增加受控内存的标准规则栅格 HDF5 读写，第三阶段 A–C 增加严格的 MintPy、LiCSBAS 与地理编码 GAMMA 规则栅格转换，第四阶段 A 增加与来源无关的 PS/DS 点 HDF5 读写。
+InSAR-Data-Adapter 是 GAMMA、MintPy、LiCSBAS、后续 PS/DS-InSAR 等科学处理系统与 PyGMT-Plotter 等消费端之间的数据契约层。第一阶段提供来源只读检查，第二阶段增加受控内存的标准规则栅格 HDF5 读写，第三阶段 A–C 增加严格的 MintPy、LiCSBAS 与地理编码 GAMMA 规则栅格转换，第四阶段 A 增加与来源无关的 PS/DS 点 HDF5 读写，第五阶段 A 向可视化消费端安全公开网格几何信息。
 
 ## 1. Responsibilities / 职责
 
@@ -100,6 +100,15 @@ with CanonicalGridWriter(
 The example uses complete arrays only for readability. Production source adapters will call `write_deformation_rows` and `write_geometry_rows` repeatedly with bounded row blocks.
 
 示例为便于阅读使用完整数组；正式来源 Adapter 将使用受控行块反复调用 `write_deformation_rows` 和 `write_geometry_rows`。
+
+Readers expose dates and dimensions through `reader.summary`, X/Y coordinates
+through `read_axis`, grid registration through `grid_registration`, and values
+through bounded `read_epoch` row slices. These public interfaces are sufficient
+for a plotting consumer without exposing the underlying HDF5 handle.
+
+Reader 通过 `reader.summary` 提供日期与维度，通过 `read_axis` 提供 X/Y 坐标，
+通过 `grid_registration` 提供网格注册方式，并通过 `read_epoch` 的受控行切片提供
+数值。绘图消费端可完全使用这些公共接口，无需访问底层 HDF5 handle。
 
 ## 9. Canonical PS/DS Point API / 标准 PS/DS 点 API
 

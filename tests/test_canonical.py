@@ -63,11 +63,18 @@ class CanonicalGridIOTests(unittest.TestCase):
             self.assertTrue(handle.attrs["write_complete"])
             self.assertEqual(handle["data/displacement"].chunks[0], 1)
         with CanonicalGridReader(output) as reader:
+            self.assertEqual(reader.grid_registration, "pixel")
+            np.testing.assert_array_equal(reader.read_axis("x"), self.x)
+            np.testing.assert_array_equal(reader.read_axis("y"), self.y)
+            with self.assertRaisesRegex(ValueError, "coordinate axis"):
+                reader.read_axis("longitude")
             selected = reader.read_epoch(1, row_start=1, row_stop=3)
             np.testing.assert_allclose(selected, np.arange(12).reshape(3, 4)[1:] + 100)
             np.testing.assert_allclose(
                 reader.read_geometry_rows("height", 2, 3), np.full((1, 4), 2.0)
             )
+        with self.assertRaisesRegex(RuntimeError, "not active"):
+            reader.read_axis("x")
 
     def test_incomplete_write_preserves_existing_target(self) -> None:
         """Remove an incomplete temporary file without replacing an old target."""
