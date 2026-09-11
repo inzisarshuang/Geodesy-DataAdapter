@@ -48,12 +48,16 @@ must occur as a pair.
 
 Consumers read the one-dimensional axes through
 `CanonicalGridReader.read_axis("x" | "y")` and the registration through the
-read-only `grid_registration` property. Both interfaces require an active reader
-context; consumers must not access the private HDF5 handle.
+read-only `grid_registration` property. The read-only `metadata` property returns
+the complete validated `GridMetadata`, including units, quantity, LOS sign,
+nodata policy, temporal/spatial references, and provenance. These interfaces
+require an active reader context; consumers must not access the private HDF5
+handle.
 
 消费端通过 `CanonicalGridReader.read_axis("x" | "y")` 读取一维坐标轴，并通过
-只读 `grid_registration` 属性读取注册方式。两者都要求 reader 处于活动上下文；
-消费端不得访问私有 HDF5 handle。
+只读 `grid_registration` 属性读取注册方式。只读 `metadata` 属性返回完整且经过
+校验的 `GridMetadata`，包括单位、形变量类型、LOS 正号、nodata 规则、时空参考和
+来源信息。这些接口都要求 reader 处于活动上下文；消费端不得访问私有 HDF5 handle。
 
 The displacement dataset must be chunked. Phase 2 writes one epoch per chunk
 and limits the row count so a float32 chunk remains near 1 MiB even when the

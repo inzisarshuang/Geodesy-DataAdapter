@@ -30,4 +30,4 @@ __all__ = [
     "detect_hdf5_format",
     "inspect_hdf5",
 ]
-__version__ = "0.7.0"
+__version__ = "0.8.0"

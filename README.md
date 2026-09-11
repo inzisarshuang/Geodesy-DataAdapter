@@ -101,14 +101,16 @@ The example uses complete arrays only for readability. Production source adapter
 
 示例为便于阅读使用完整数组；正式来源 Adapter 将使用受控行块反复调用 `write_deformation_rows` 和 `write_geometry_rows`。
 
-Readers expose dates and dimensions through `reader.summary`, X/Y coordinates
-through `read_axis`, grid registration through `grid_registration`, and values
-through bounded `read_epoch` row slices. These public interfaces are sufficient
-for a plotting consumer without exposing the underlying HDF5 handle.
+Readers expose dates and dimensions through `reader.summary`, complete validated
+scientific metadata through `reader.metadata`, X/Y coordinates through
+`read_axis`, grid registration through `grid_registration`, and values through
+bounded `read_epoch` row slices. These public interfaces are sufficient for a
+plotting consumer without exposing the underlying HDF5 handle.
 
-Reader 通过 `reader.summary` 提供日期与维度，通过 `read_axis` 提供 X/Y 坐标，
-通过 `grid_registration` 提供网格注册方式，并通过 `read_epoch` 的受控行切片提供
-数值。绘图消费端可完全使用这些公共接口，无需访问底层 HDF5 handle。
+Reader 通过 `reader.summary` 提供日期与维度，通过 `reader.metadata` 提供完整且
+经过校验的科学元数据，通过 `read_axis` 提供 X/Y 坐标，通过
+`grid_registration` 提供网格注册方式，并通过 `read_epoch` 的受控行切片提供数值。
+绘图消费端可完全使用这些公共接口，无需访问底层 HDF5 handle。
 
 ## 9. Canonical PS/DS Point API / 标准 PS/DS 点 API
 

@@ -390,13 +390,35 @@ class CanonicalGridReader:
         return self._handle
 
     @property
+    def metadata(self) -> GridMetadata:
+        """Return all validated scientific metadata from the active canonical grid."""
+        attributes = self._require_handle().attrs
+
+        def text(name: str) -> str:
+            """Normalize one required HDF5 text attribute without inference."""
+            value = attributes[name]
+            return value.decode("utf-8") if isinstance(value, bytes) else str(value)
+
+        metadata = GridMetadata(
+            source_format=text("source_format"),
+            deformation_unit=text("deformation_unit"),
+            deformation_quantity=text("deformation_quantity"),
+            los_positive=text("los_positive"),
+            crs=text("crs"),
+            nodata_policy=text("nodata_policy"),
+            temporal_reference=text("temporal_reference"),
+            spatial_reference=text("spatial_reference"),
+            source_provenance=text("source_provenance"),
+            height_unit=text("height_unit"),
+            grid_registration=text("grid_registration"),
+        )
+        metadata.validate()
+        return metadata
+
+    @property
     def grid_registration(self) -> str:
         """Return the validated pixel or gridline registration of the active grid."""
-        value = self._require_handle().attrs["grid_registration"]
-        registration = value.decode("utf-8") if isinstance(value, bytes) else str(value)
-        if registration not in {"pixel", "gridline"}:
-            raise ValueError(f"unsupported canonical grid registration: {registration}")
-        return registration
+        return self.metadata.grid_registration
 
     def read_axis(self, name: str) -> np.ndarray:
         """Read the complete one-dimensional X or Y coordinate axis."""
