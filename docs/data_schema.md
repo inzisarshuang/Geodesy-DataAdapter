@@ -169,3 +169,29 @@ Its shape is exactly `[point]` or `[time, point]`, and it must declare non-empty
 - Unit scaling occurs exactly once at a named output boundary.<br>单位缩放只允许在明确的输出边界执行一次。
 - Zero and nodata remain distinct.<br>零值与 nodata 始终区分。
 - A temporal reference never substitutes for a spatial reference.<br>时间参考不能替代空间参考。
+
+## 5. Defsour Point-Table Source Boundary / Defsour 点表来源边界
+
+`DefsourPointSource` is the formal read-only boundary for headerless Defsour
+snapshots. The default zero-based columns are X=0, Y=1, elevation=2, and
+deformation=3; alternative distinct column assignments must be explicit. Blank
+lines and lines beginning with `#` are ignored. Coordinates must be finite,
+while elevation and deformation may retain NaN according to the declared nodata
+policy. Blocks contain at most `chunk_points` rows and are emitted before later
+rows are scanned.
+
+`DefsourPointSource` 是无文件头 Defsour 快照的正式只读边界。默认零基列为
+X=0、Y=1、高程=2、形变=3；不同且不重复的其他列配置必须显式声明。空行和以
+`#` 开头的行会被忽略。坐标必须为有限值，高程与形变可根据显式 nodata 规则
+保留 NaN。每个点块不超过 `chunk_points` 行，并会在扫描后续行之前返回。
+
+`DefsourMetadata` makes the input CRS, deformation and height units, deformation
+quantity, LOS sign, nodata policy, temporal/spatial references, and provenance
+mandatory. `iter_blocks(target_crs=...)` performs one explicit `always_xy`
+coordinate transformation. The source never scales deformation and never grids
+or interpolates points; those are named output/rendering boundaries.
+
+`DefsourMetadata` 强制声明输入 CRS、形变与高程单位、形变量类型、LOS 正号、
+nodata 规则、时空参考和来源。`iter_blocks(target_crs=...)` 只在明确指定时执行
+一次 `always_xy` 坐标转换。来源读取器不缩放形变，也不进行点转栅格或插值；
+这些操作属于具名的输出或渲染边界。

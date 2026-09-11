@@ -1,8 +1,8 @@
 # InSAR-Data-Adapter
 
-InSAR-Data-Adapter is the data-contract layer between scientific processing systems such as GAMMA, MintPy, LiCSBAS, and future PS/DS-InSAR workflows and consumers such as PyGMT-Plotter. Phase 1 provides read-only source inspection, Phase 2 adds bounded-memory canonical grid HDF5 I/O, Phases 3A–3C add strict MintPy, LiCSBAS, and geocoded GAMMA grid conversion, Phase 4A adds source-neutral PS/DS point HDF5 I/O, and Phase 5A exposes grid geometry safely to visualization consumers.
+InSAR-Data-Adapter is the data-contract layer between scientific processing systems such as GAMMA, MintPy, LiCSBAS, and future PS/DS-InSAR workflows and consumers such as PyGMT-Plotter. Phase 1 provides read-only source inspection, Phase 2 adds bounded-memory canonical grid HDF5 I/O, Phases 3A–3C add strict MintPy, LiCSBAS, and geocoded GAMMA grid conversion, Phase 4A adds source-neutral PS/DS point HDF5 I/O, Phase 5A exposes grid geometry safely to visualization consumers, and Phase 5B adds bounded Defsour point-table ingestion with explicit CRS conversion.
 
-InSAR-Data-Adapter 是 GAMMA、MintPy、LiCSBAS、后续 PS/DS-InSAR 等科学处理系统与 PyGMT-Plotter 等消费端之间的数据契约层。第一阶段提供来源只读检查，第二阶段增加受控内存的标准规则栅格 HDF5 读写，第三阶段 A–C 增加严格的 MintPy、LiCSBAS 与地理编码 GAMMA 规则栅格转换，第四阶段 A 增加与来源无关的 PS/DS 点 HDF5 读写，第五阶段 A 向可视化消费端安全公开网格几何信息。
+InSAR-Data-Adapter 是 GAMMA、MintPy、LiCSBAS、后续 PS/DS-InSAR 等科学处理系统与 PyGMT-Plotter 等消费端之间的数据契约层。第一阶段提供来源只读检查，第二阶段增加受控内存的标准规则栅格 HDF5 读写，第三阶段 A–C 增加严格的 MintPy、LiCSBAS 与地理编码 GAMMA 规则栅格转换，第四阶段 A 增加与来源无关的 PS/DS 点 HDF5 读写，第五阶段 A 向可视化消费端安全公开网格几何信息，第五阶段 B 增加显式 CRS 转换的受控分块 Defsour 点表读取。
 
 ## 1. Responsibilities / 职责
 
@@ -10,10 +10,11 @@ InSAR-Data-Adapter 是 GAMMA、MintPy、LiCSBAS、后续 PS/DS-InSAR 等科学�
 - Expose one metadata summary for MintPy, LiCSBAS, and canonical products.<br>为 MintPy、LiCSBAS 和标准产品提供统一元数据摘要。
 - Validate time dimensions, spatial dimensions, date vectors, units, and source-format expectations.<br>校验时间维、空间维、日期向量、单位和预期源格式。
 - Define separate canonical layouts for dense grids and sparse PS/DS points.<br>分别定义规则栅格与稀疏 PS/DS 点的标准布局。
+- Parse Defsour snapshots in bounded point blocks with explicit scientific metadata and optional CRS conversion.<br>使用显式科学元数据和可选 CRS 转换，按受控点块解析 Defsour 快照。
 
-Radar-coordinate GAMMA input, source-specific PS/DS ingestion, Defsour/GRD/GeoTIFF exporters, and PyGMT integration are intentionally deferred to later phases.
+Radar-coordinate GAMMA input, source-specific PS/DS ingestion, Defsour/GRD/GeoTIFF exporters, and direct PyGMT rendering are intentionally deferred to later phases.
 
-雷达坐标 GAMMA 输入、特定来源的 PS/DS 接入、Defsour/GRD/GeoTIFF 导出及 PyGMT 接入明确留到后续阶段。
+雷达坐标 GAMMA 输入、特定来源的 PS/DS 接入、Defsour/GRD/GeoTIFF 导出及直接 PyGMT 渲染明确留到后续阶段。
 
 ## 2. Installation / 安装
 
@@ -177,6 +178,38 @@ with CanonicalPointWriter(
 
 The complete PSI_WWQ/PSI_ZDN source mapping and cfg are intentionally assigned
 to Phase 4B after read-only source inspection.
+
+## 10. Defsour Point Source / Defsour 点表来源
+
+`DefsourPointSource` reads a headerless point snapshot without loading the
+complete table. The default columns are X, Y, elevation, and deformation. All
+scientific semantics are mandatory in `DefsourMetadata`; optional coordinate
+conversion is requested explicitly from `iter_blocks`, and deformation values
+are never scaled implicitly.
+
+`DefsourPointSource` 在不载入完整点表的情况下读取无文件头快照。默认列依次为
+X、Y、高程和形变。所有科学语义必须通过 `DefsourMetadata` 显式声明；坐标转换
+只能由 `iter_blocks` 显式请求，形变值不会被隐式缩放。
+
+```python
+from insar_data_adapter import DefsourMetadata, DefsourPointSource
+
+metadata = DefsourMetadata(
+    input_crs="EPSG:32605",
+    deformation_unit="cm",
+    deformation_quantity="cumulative_displacement",
+    height_unit="m",
+    los_positive="toward_satellite",
+    nodata_policy="NaN is nodata; zero is valid",
+    temporal_reference="20160512",
+    spatial_reference="none",
+    source_provenance="LiCSBAS_ASC/D20160512",
+)
+
+with DefsourPointSource("D20160512", metadata) as source:
+    for block in source.iter_blocks(target_crs="EPSG:4326"):
+        consume(block.x, block.y, block.height, block.deformation)
+```
 
 完整的 PSI_WWQ/PSI_ZDN 来源映射与 cfg 将在只读检查来源后于第四阶段 B 实现。
 

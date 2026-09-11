@@ -10,7 +10,14 @@ from .points import (
     PointMetadata,
     PointQualitySpec,
 )
-from .sources import GammaGeoGridSource, LiCSBASGridSource, MintPyGridSource
+from .sources import (
+    DefsourMetadata,
+    DefsourPointBlock,
+    DefsourPointSource,
+    GammaGeoGridSource,
+    LiCSBASGridSource,
+    MintPyGridSource,
+)
 
 __all__ = [
     "CanonicalGridReader",
@@ -18,6 +25,9 @@ __all__ = [
     "CanonicalPointReader",
     "CanonicalPointWriter",
     "DatasetSummary",
+    "DefsourMetadata",
+    "DefsourPointBlock",
+    "DefsourPointSource",
     "GammaGeoGridSource",
     "GridMetadata",
     "LiCSBASGridSource",
@@ -30,4 +40,4 @@ __all__ = [
     "detect_hdf5_format",
     "inspect_hdf5",
 ]
-__version__ = "0.8.0"
+__version__ = "0.9.0"
