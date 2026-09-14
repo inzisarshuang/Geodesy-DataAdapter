@@ -9,6 +9,11 @@ from .converters import (
     convert_licsbas_grid,
     convert_mintpy_grid,
 )
+from .exporters import (
+    DefsourExportMetadata,
+    DefsourExportResult,
+    write_defsour_blocks,
+)
 from .hdf5 import detect_hdf5_format, inspect_hdf5
 from .model import DatasetSummary
 from .points import (
@@ -36,6 +41,8 @@ __all__ = [
     "CanonicalPointWriter",
     "DatasetSummary",
     "DefsourMetadata",
+    "DefsourExportMetadata",
+    "DefsourExportResult",
     "DefsourPointBlock",
     "DefsourPointSource",
     "GammaGeoGridSource",
@@ -55,5 +62,6 @@ __all__ = [
     "convert_mintpy_grid",
     "detect_hdf5_format",
     "inspect_hdf5",
+    "write_defsour_blocks",
 ]
-__version__ = "0.11.0"
+__version__ = "0.12.0"

@@ -1,8 +1,8 @@
 # InSAR-Data-Adapter
 
-InSAR-Data-Adapter is the data-contract layer between scientific processing systems such as GAMMA, MintPy, LiCSBAS, and future PS/DS-InSAR workflows and consumers such as PyGMT-Plotter. It provides bounded source readers, canonical grid/point HDF5, strict conversions, safe grid geometry, and explicit Defsour plus headered point-table ingestion.
+InSAR-Data-Adapter is the data-contract layer between scientific processing systems such as GAMMA, MintPy, LiCSBAS, and future PS/DS-InSAR workflows and consumers such as PyGMT-Plotter. It provides bounded source readers, canonical grid/point HDF5, strict conversions, safe grid geometry, explicit point-table ingestion, and atomic Defsour export.
 
-InSAR-Data-Adapter 是 GAMMA、MintPy、LiCSBAS、后续 PS/DS-InSAR 等科学处理系统与 PyGMT-Plotter 等消费端之间的数据契约层，提供受控来源读取、标准栅格/点 HDF5、严格转换、安全网格几何，以及显式的 Defsour 和带表头点表读取。
+InSAR-Data-Adapter 是 GAMMA、MintPy、LiCSBAS、后续 PS/DS-InSAR 等科学处理系统与 PyGMT-Plotter 等消费端之间的数据契约层，提供受控来源读取、标准栅格/点 HDF5、严格转换、安全网格几何、显式点表读取及原子 Defsour 导出。
 
 ## 1. Responsibilities / 职责
 
@@ -11,12 +11,13 @@ InSAR-Data-Adapter 是 GAMMA、MintPy、LiCSBAS、后续 PS/DS-InSAR 等科学�
 - Validate time dimensions, spatial dimensions, date vectors, units, and source-format expectations.<br>校验时间维、空间维、日期向量、单位和预期源格式。
 - Define separate canonical layouts for dense grids and sparse PS/DS points.<br>分别定义规则栅格与稀疏 PS/DS 点的标准布局。
 - Parse Defsour snapshots in bounded point blocks with explicit scientific metadata and optional CRS conversion.<br>使用显式科学元数据和可选 CRS 转换，按受控点块解析 Defsour 快照。
+- Export validated consecutive point blocks to atomic four-column Defsour text without hidden transformations.<br>将已校验的连续点块原子导出为四列 Defsour 文本，不执行隐藏转换。
 - Parse named headered point-value snapshots without loading complete tables.<br>按具名表头解析点值快照，且不加载完整数据表。
 - Reproject and scale single-band GeoTIFFs with explicit metadata, nodata, resampling, and atomic output.<br>使用显式元数据、nodata、重采样和原子输出重投影及缩放单波段 GeoTIFF。
 
-Radar-coordinate GAMMA input, source-specific PS/DS ingestion, Defsour/GRD/GeoTIFF exporters, and direct PyGMT rendering are intentionally deferred to later phases.
+Radar-coordinate GAMMA input, source-specific PS/DS ingestion, GRD export, canonical-to-GeoTIFF export, and direct PyGMT rendering are intentionally deferred to later phases. Defsour 7A currently exposes a Python writer only; source-specific CLI delegation remains gated by shadow comparison.
 
-雷达坐标 GAMMA 输入、特定来源的 PS/DS 接入、Defsour/GRD/GeoTIFF 导出及直接 PyGMT 渲染明确留到后续阶段。
+雷达坐标 GAMMA 输入、特定来源的 PS/DS 接入、GRD 导出、标准产品到 GeoTIFF 导出及直接 PyGMT 渲染明确留到后续阶段。Defsour 7A 当前只提供 Python writer；来源专用 CLI 委托仍需先通过影子对照。
 
 ## 2. Installation / 安装
 
@@ -260,7 +261,33 @@ and resampling. Inputs without embedded CRS are rejected unless
 LOS、参考、来源、比例和重采样。输入缺少内嵌 CRS 时，必须显式设置
 `source_crs_override`，否则拒绝处理。转换器不会调用 GMT。
 
-## 13. Verification / 验证
+## 13. Defsour Export / Defsour 导出
+
+`write_defsour_blocks` atomically writes validated, consecutive point blocks as
+four-column headerless Defsour text. Complete scientific metadata is mandatory,
+and the writer performs no hidden source conversion.
+
+`write_defsour_blocks` 将已校验且连续的点块原子写为四列无表头 Defsour 文本。
+接口强制提供完整科学元数据，不执行任何隐藏的来源转换。
+
+```python
+from insar_data_adapter import DefsourExportMetadata, write_defsour_blocks
+
+metadata = DefsourExportMetadata(
+    crs="EPSG:32628",
+    deformation_unit="cm",
+    deformation_quantity="cumulative_displacement",
+    height_unit="m",
+    los_positive="toward_satellite",
+    nodata_policy="NaN is nodata; zero is valid",
+    temporal_reference="20240101",
+    spatial_reference="radar row 20 column 30, zero-based",
+    source_provenance="validated processing manifest",
+)
+result = write_defsour_blocks(blocks, "D20240101", metadata)
+```
+
+## 14. Verification / 验证
 
 ```bash
 python -m compileall -q src tests

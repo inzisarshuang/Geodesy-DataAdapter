@@ -224,3 +224,25 @@ remain separate named boundaries.
 LOS、nodata、时空参考和来源仍由可机器校验的 `PointValueMetadata` 负责。
 它不同于标准时序 `PointMetadata`，不要求高程字段，也不把科学量限制为位移或
 速度。显式 `target_crs` 转换采用 `always_xy`；数值缩放和制网仍是独立具名边界。
+
+## 7. Defsour Export Boundary / Defsour 导出边界
+
+`write_defsour_blocks` accepts only consecutive `DefsourPointBlock` objects in
+one explicitly declared CRS. It preserves block order and writes X, Y, elevation,
+and deformation as four headerless columns. It performs no source reading, unit
+scaling, coordinate conversion, interpolation, masking, or re-referencing.
+
+`write_defsour_blocks` 只接收同一显式 CRS 下连续的 `DefsourPointBlock`，保持点块
+顺序，并将 X、Y、高程和形变写为四列无表头文本。接口不读取来源、不缩放单位、
+不转换坐标、不插值、不生成 mask，也不重新参考。
+
+`DefsourExportMetadata` requires CRS, deformation/height units, deformation
+quantity, LOS sign, nodata policy, temporal/spatial references, and provenance.
+The writer rejects missing metadata, discontinuous blocks, non-finite coordinates,
+infinite values, ambiguous replacement, and formats that do not produce exactly
+four numeric columns. A failed stream never replaces an existing destination.
+
+`DefsourExportMetadata` 强制声明 CRS、形变/高程单位、形变量、LOS 正号、nodata
+规则、时空参考和来源。writer 会拒绝元数据缺失、点块不连续、坐标非有限、数值为
+无穷、覆盖语义不明确，以及不能生成恰好四个数值列的格式；流式写出失败时不会
+替换已有目标。
