@@ -12,6 +12,7 @@ InSAR-Data-Adapter 是 GAMMA、MintPy、LiCSBAS、后续 PS/DS-InSAR 等科学�
 - Define separate canonical layouts for dense grids and sparse PS/DS points.<br>分别定义规则栅格与稀疏 PS/DS 点的标准布局。
 - Parse Defsour snapshots in bounded point blocks with explicit scientific metadata and optional CRS conversion.<br>使用显式科学元数据和可选 CRS 转换，按受控点块解析 Defsour 快照。
 - Parse named headered point-value snapshots without loading complete tables.<br>按具名表头解析点值快照，且不加载完整数据表。
+- Reproject and scale single-band GeoTIFFs with explicit metadata, nodata, resampling, and atomic output.<br>使用显式元数据、nodata、重采样和原子输出重投影及缩放单波段 GeoTIFF。
 
 Radar-coordinate GAMMA input, source-specific PS/DS ingestion, Defsour/GRD/GeoTIFF exporters, and direct PyGMT rendering are intentionally deferred to later phases.
 
@@ -248,7 +249,18 @@ with HeaderedPointTableSource(
         consume(block.x, block.y, block.value)
 ```
 
-## 12. Verification / 验证
+## 12. GeoTIFF Raster Adaptation / GeoTIFF 栅格适配
+
+`convert_geotiff_raster` produces an atomic float32 GeoTIFF while preserving an
+explicit record of units, quantity, LOS sign, references, provenance, scale,
+and resampling. Inputs without embedded CRS are rejected unless
+`source_crs_override` is explicit. The converter never invokes GMT.
+
+`convert_geotiff_raster` 原子生成 float32 GeoTIFF，并明确记录单位、物理量、
+LOS、参考、来源、比例和重采样。输入缺少内嵌 CRS 时，必须显式设置
+`source_crs_override`，否则拒绝处理。转换器不会调用 GMT。
+
+## 13. Verification / 验证
 
 ```bash
 python -m compileall -q src tests

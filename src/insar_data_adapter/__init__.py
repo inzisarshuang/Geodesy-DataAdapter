@@ -1,7 +1,14 @@
 """Public interfaces for InSAR inspection and canonical grid/point I/O."""
 
 from .canonical import CanonicalGridReader, CanonicalGridWriter, GridMetadata
-from .converters import convert_gamma_grid, convert_licsbas_grid, convert_mintpy_grid
+from .converters import (
+    GeoTiffConversionResult,
+    GeoTiffValueMetadata,
+    convert_gamma_grid,
+    convert_geotiff_raster,
+    convert_licsbas_grid,
+    convert_mintpy_grid,
+)
 from .hdf5 import detect_hdf5_format, inspect_hdf5
 from .model import DatasetSummary
 from .points import (
@@ -32,6 +39,8 @@ __all__ = [
     "DefsourPointBlock",
     "DefsourPointSource",
     "GammaGeoGridSource",
+    "GeoTiffConversionResult",
+    "GeoTiffValueMetadata",
     "HeaderedPointTableSource",
     "GridMetadata",
     "LiCSBASGridSource",
@@ -41,9 +50,10 @@ __all__ = [
     "PointValueBlock",
     "PointValueMetadata",
     "convert_gamma_grid",
+    "convert_geotiff_raster",
     "convert_licsbas_grid",
     "convert_mintpy_grid",
     "detect_hdf5_format",
     "inspect_hdf5",
 ]
-__version__ = "0.10.0"
+__version__ = "0.11.0"
