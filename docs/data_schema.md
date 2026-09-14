@@ -246,3 +246,16 @@ four numeric columns. A failed stream never replaces an existing destination.
 规则、时空参考和来源。writer 会拒绝元数据缺失、点块不连续、坐标非有限、数值为
 无穷、覆盖语义不明确，以及不能生成恰好四个数值列的格式；流式写出失败时不会
 替换已有目标。
+
+`write_defsour_grid` adds only a bounded row-major grid-to-block mapping. The
+caller supplies equal-shape X/Y/height/deformation/mask arrays and explicitly
+chooses whether selected NaN payloads are retained; all publication guarantees
+remain those of `write_defsour_blocks`. A grid with no selected cells atomically
+publishes an empty epoch file for compatibility; direct block export still
+rejects empty input unless `allow_empty=True` is explicit.
+
+`write_defsour_grid` 只增加受控内存的行主序网格到点块映射。调用方提供
+同形的 X/Y/高程/形变/mask 数组，并显式选择是否保留已选中的 NaN 载荷；
+发布保证仍完全由 `write_defsour_blocks` 定义。
+零选中像元的网格会为了兼容性原子发布空历元文件；直接点块导出仍默认
+拒绝空输入，除非显式设置 `allow_empty=True`。

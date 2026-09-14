@@ -42,7 +42,7 @@ GAMMA / MintPy / PS-DS-InSAR
 6. Separate legacy source preparation in bounded subphases: formalize Defsour point parsing and CRS conversion in the adapter (6A source contract complete), then let Visualization retain only temporary GMT gridding and verify it against real-data baselines.<br>分阶段拆分旧来源准备逻辑：先在 Adapter 中规范 Defsour 点表解析与 CRS 转换（6A 来源契约已完成），再让 Visualization 仅保留 GMT 临时网格化，并用真实数据基线验收。
 7. Formalize named, headered point-value ingestion before replacing Visualization's legacy TXT parsing (6B source contract). Preserve descriptive value headers while keeping scientific metadata independently explicit.<br>在替换 Visualization 的旧 TXT 解析前，先规范具名、带表头的点值读取（6B 来源契约）；保留描述性数值字段名，同时独立显式记录科学元数据。
 8. Separate GeoTIFF adaptation from GMT rendering (6C): Adapter owns explicit CRS, resampling, nodata, scaling, provenance, and atomic GeoTIFF output; Visualization may consume that output for temporary GRD preparation.<br>将 GeoTIFF 适配与 GMT 渲染拆分（6C）：Adapter 负责显式 CRS、重采样、nodata、缩放、来源及原子 GeoTIFF 输出；Visualization 可消费该输出准备临时 GRD。
-9. Add persistent exchange exporters in bounded phases (7A): first accept only validated, consecutive point blocks and write Defsour text atomically without reading or transforming source products.<br>分阶段增加持久交换格式 exporter（7A）：首阶段只接收已校验且连续的点块，原子写出 Defsour 文本，不读取或转换来源产品。
+9. Add persistent exchange exporters in bounded phases (7A): accept validated consecutive point blocks or equal-shape masked grids and write Defsour text atomically without reading or transforming source products.<br>分阶段增加持久交换格式 exporter（7A）：接收已校验的连续点块或同形带掩膜网格，原子写出 Defsour 文本，不读取或转换来源产品。
 
 No phase should require a broad rewrite of an upstream processing repository.
 

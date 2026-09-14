@@ -12,6 +12,7 @@ from insar_data_adapter import (
     DefsourExportMetadata,
     DefsourPointBlock,
     write_defsour_blocks,
+    write_defsour_grid,
 )
 
 
@@ -131,6 +132,65 @@ class DefsourExportTests(unittest.TestCase):
                     self.metadata,
                     fmt="%.1f,%.1f,%.1f,%.1f",
                 )
+
+    def test_grid_export_matches_legacy_filter_and_row_order(self) -> None:
+        """Filter grids by row blocks without changing legacy output ordering."""
+        x = np.array([[1.0, 2.0], [3.0, 4.0]])
+        y = x + 10.0
+        height = np.array([[100.0, np.nan], [300.0, 400.0]])
+        deformation = np.array([[0.1, 0.2], [np.nan, 0.4]])
+        valid = np.array([[True, True], [True, False]])
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "grid.txt"
+            result = write_defsour_grid(
+                x,
+                y,
+                height,
+                deformation,
+                valid,
+                output,
+                self.metadata,
+                fmt="%.1f %.1f %.1f %.1f",
+                block_rows=1,
+            )
+            self.assertEqual(result.point_count, 1)
+            self.assertEqual(output.read_text(encoding="ascii"), "1.0 11.0 100.0 0.1\n")
+
+    def test_grid_export_can_retain_nan_payloads(self) -> None:
+        """Keep selected NaN payloads only when the caller explicitly requests it."""
+        values = np.array([[1.0, 2.0]])
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "grid.txt"
+            result = write_defsour_grid(
+                values,
+                values,
+                np.array([[np.nan, 3.0]]),
+                np.array([[4.0, np.nan]]),
+                np.ones((1, 2), dtype=bool),
+                output,
+                self.metadata,
+                export_invalid_points=True,
+            )
+            self.assertEqual(result.point_count, 2)
+
+    def test_grid_export_atomically_publishes_an_empty_epoch(self) -> None:
+        """Preserve the legacy grid contract when an epoch has no selected cells."""
+        values = np.ones((2, 2), dtype=float)
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "empty.txt"
+            output.write_text("old\n", encoding="ascii")
+            result = write_defsour_grid(
+                values,
+                values,
+                values,
+                values,
+                np.zeros((2, 2), dtype=bool),
+                output,
+                self.metadata,
+                overwrite=True,
+            )
+            self.assertEqual(result.point_count, 0)
+            self.assertEqual(output.read_bytes(), b"")
 
 
 if __name__ == "__main__":

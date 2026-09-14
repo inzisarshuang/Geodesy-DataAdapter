@@ -10,11 +10,17 @@ exporters
     公共接口由各格式模块定义，本模块只重导出稳定的数据类型和函数。
 """
 
-from .defsour import DefsourExportMetadata, DefsourExportResult, write_defsour_blocks
+from .defsour import (
+    DefsourExportMetadata,
+    DefsourExportResult,
+    write_defsour_blocks,
+    write_defsour_grid,
+)
 
 
 __all__ = [
     "DefsourExportMetadata",
     "DefsourExportResult",
     "write_defsour_blocks",
+    "write_defsour_grid",
 ]

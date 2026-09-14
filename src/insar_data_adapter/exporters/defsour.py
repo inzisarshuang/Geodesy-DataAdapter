@@ -13,6 +13,8 @@ defsour_export
         返回已发布文件、点数和显式元数据。
     ``write_defsour_blocks``:
         校验连续点块并原子写出四列 Defsour 文本。
+    ``write_defsour_grid``:
+        按行块筛选二维网格并复用点块写出契约。
 """
 
 from __future__ import annotations
@@ -137,6 +139,7 @@ def write_defsour_blocks(
     *,
     fmt: str = "%.6f %.6f %.6f %.6f",
     overwrite: bool = False,
+    allow_empty: bool = False,
 ) -> DefsourExportResult:
     """Validate consecutive point blocks and atomically publish Defsour text."""
     output = Path(output_file).expanduser().resolve()
@@ -155,7 +158,7 @@ def write_defsour_blocks(
                 matrix = _block_matrix(block, point_count, expected_crs)
                 np.savetxt(stream, matrix, fmt=normalized_format)
                 point_count += int(matrix.shape[0])
-            if point_count == 0:
+            if point_count == 0 and not allow_empty:
                 raise ValueError("Defsour export requires at least one point block")
             stream.flush()
             os.fsync(stream.fileno())
@@ -168,3 +171,72 @@ def write_defsour_blocks(
         Path(temporary_name).unlink(missing_ok=True)
         raise
     return DefsourExportResult(output, point_count, metadata)
+
+
+def write_defsour_grid(
+    x: np.ndarray,
+    y: np.ndarray,
+    height: np.ndarray,
+    deformation: np.ndarray,
+    valid_mask: np.ndarray,
+    output_file: str | Path,
+    metadata: DefsourExportMetadata,
+    *,
+    fmt: str = "%.6f %.6f %.6f %.6f",
+    export_invalid_points: bool = False,
+    block_rows: int = 128,
+    overwrite: bool = False,
+) -> DefsourExportResult:
+    """Filter one 2-D grid in bounded row blocks and publish Defsour text."""
+    arrays = tuple(
+        np.asarray(value)
+        for value in (x, y, height, deformation, valid_mask)
+    )
+    shape = arrays[0].shape
+    if any(value.shape != shape for value in arrays[1:]):
+        raise ValueError(
+            "x, y, height, deformation, and valid_mask must share one shape"
+        )
+    if len(shape) != 2:
+        raise ValueError("Defsour grid inputs must be two-dimensional")
+    if block_rows <= 0:
+        raise ValueError("block_rows must be positive")
+
+    x_values, y_values, height_values, deformation_values = arrays[:4]
+    mask_values = arrays[4].astype(bool, copy=False)
+
+    def blocks() -> Iterable[DefsourPointBlock]:
+        point_start = 0
+        for row_start in range(0, shape[0], block_rows):
+            rows = slice(row_start, min(row_start + block_rows, shape[0]))
+            selected = (
+                mask_values[rows]
+                & np.isfinite(x_values[rows])
+                & np.isfinite(y_values[rows])
+            )
+            if not export_invalid_points:
+                selected &= (
+                    np.isfinite(height_values[rows])
+                    & np.isfinite(deformation_values[rows])
+                )
+            count = int(np.count_nonzero(selected))
+            if count == 0:
+                continue
+            yield DefsourPointBlock(
+                point_start=point_start,
+                x=x_values[rows][selected],
+                y=y_values[rows][selected],
+                height=height_values[rows][selected],
+                deformation=deformation_values[rows][selected],
+                crs=metadata.crs,
+            )
+            point_start += count
+
+    return write_defsour_blocks(
+        blocks(),
+        output_file,
+        metadata,
+        fmt=fmt,
+        overwrite=overwrite,
+        allow_empty=True,
+    )

@@ -13,6 +13,7 @@ from .exporters import (
     DefsourExportMetadata,
     DefsourExportResult,
     write_defsour_blocks,
+    write_defsour_grid,
 )
 from .hdf5 import detect_hdf5_format, inspect_hdf5
 from .model import DatasetSummary
@@ -63,5 +64,6 @@ __all__ = [
     "detect_hdf5_format",
     "inspect_hdf5",
     "write_defsour_blocks",
+    "write_defsour_grid",
 ]
-__version__ = "0.12.0"
+__version__ = "0.12.1"

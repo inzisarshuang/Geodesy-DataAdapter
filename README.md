@@ -11,7 +11,7 @@ InSAR-Data-Adapter 是 GAMMA、MintPy、LiCSBAS、后续 PS/DS-InSAR 等科学�
 - Validate time dimensions, spatial dimensions, date vectors, units, and source-format expectations.<br>校验时间维、空间维、日期向量、单位和预期源格式。
 - Define separate canonical layouts for dense grids and sparse PS/DS points.<br>分别定义规则栅格与稀疏 PS/DS 点的标准布局。
 - Parse Defsour snapshots in bounded point blocks with explicit scientific metadata and optional CRS conversion.<br>使用显式科学元数据和可选 CRS 转换，按受控点块解析 Defsour 快照。
-- Export validated consecutive point blocks to atomic four-column Defsour text without hidden transformations.<br>将已校验的连续点块原子导出为四列 Defsour 文本，不执行隐藏转换。
+- Export validated consecutive point blocks or masked 2-D grids to atomic four-column Defsour text without hidden transformations.<br>将已校验的连续点块或带掩膜二维网格原子导出为四列 Defsour 文本，不执行隐藏转换。
 - Parse named headered point-value snapshots without loading complete tables.<br>按具名表头解析点值快照，且不加载完整数据表。
 - Reproject and scale single-band GeoTIFFs with explicit metadata, nodata, resampling, and atomic output.<br>使用显式元数据、nodata、重采样和原子输出重投影及缩放单波段 GeoTIFF。
 
@@ -264,11 +264,13 @@ LOS、参考、来源、比例和重采样。输入缺少内嵌 CRS 时，必须
 ## 13. Defsour Export / Defsour 导出
 
 `write_defsour_blocks` atomically writes validated, consecutive point blocks as
-four-column headerless Defsour text. Complete scientific metadata is mandatory,
-and the writer performs no hidden source conversion.
+four-column headerless Defsour text. `write_defsour_grid` applies the same writer
+to matching 2-D arrays in bounded row blocks. Complete scientific metadata is
+mandatory, and neither API performs hidden source conversion.
 
-`write_defsour_blocks` 将已校验且连续的点块原子写为四列无表头 Defsour 文本。
-接口强制提供完整科学元数据，不执行任何隐藏的来源转换。
+`write_defsour_blocks` 将已校验且连续的点块原子写为四列无表头 Defsour 文本；
+`write_defsour_grid` 将同一契约按受控行块应用于同形二维数组。两个接口都强制
+提供完整科学元数据，不执行任何隐藏的来源转换。
 
 ```python
 from insar_data_adapter import DefsourExportMetadata, write_defsour_blocks
