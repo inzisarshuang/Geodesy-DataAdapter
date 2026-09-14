@@ -227,19 +227,18 @@ source file but are not loaded.
 表头为绘图值”约定。来源文件可保留额外字段，但读取器不会加载它们。
 
 ```python
-from insar_data_adapter import HeaderedPointTableSource, PointMetadata
+from insar_data_adapter import HeaderedPointTableSource, PointValueMetadata
 
-metadata = PointMetadata(
+metadata = PointValueMetadata(
     source_format="headered_text_points",
-    deformation_unit="cm/yr",
-    deformation_quantity="velocity",
+    value_unit="cm/yr",
+    value_quantity="velocity",
     los_positive="toward_satellite",
     crs="EPSG:4326",
     nodata_policy="NaN is nodata; zero is valid",
     temporal_reference="velocity interval in source manifest",
     spatial_reference="none",
     source_provenance="points.txt",
-    height_unit="not_applicable",
 )
 
 with HeaderedPointTableSource(

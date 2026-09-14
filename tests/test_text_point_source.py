@@ -8,7 +8,7 @@ from pathlib import Path
 
 import numpy as np
 
-from insar_data_adapter import HeaderedPointTableSource, PointMetadata
+from insar_data_adapter import HeaderedPointTableSource, PointValueMetadata
 
 
 class HeaderedPointTableSourceTests(unittest.TestCase):
@@ -19,17 +19,16 @@ class HeaderedPointTableSourceTests(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name)
-        self.metadata = PointMetadata(
+        self.metadata = PointValueMetadata(
             source_format="headered_text_points",
-            deformation_unit="cm/yr",
-            deformation_quantity="velocity",
+            value_unit="cm/yr",
+            value_quantity="velocity",
             los_positive="toward_satellite",
             crs="EPSG:32631",
             nodata_policy="NaN is nodata; zero is valid",
             temporal_reference="velocity interval declared by source manifest",
             spatial_reference="none",
             source_provenance="synthetic headered point unit test",
-            height_unit="not_applicable",
         )
 
     def test_reads_named_columns_in_bounded_transformed_blocks(self) -> None:
@@ -71,7 +70,7 @@ class HeaderedPointTableSourceTests(unittest.TestCase):
             "invalid later row\n",
             encoding="utf-8",
         )
-        geographic = PointMetadata(**{**self.metadata.__dict__, "crs": "EPSG:4326"})
+        geographic = PointValueMetadata(**{**self.metadata.__dict__, "crs": "EPSG:4326"})
         with HeaderedPointTableSource(
             path, geographic, chunk_points=2
         ) as source:
@@ -90,7 +89,7 @@ class HeaderedPointTableSourceTests(unittest.TestCase):
             ("lon lat value\nnan 2 3\n", "non-finite coordinate"),
             ("lon lat value\n", "contains no data rows"),
         )
-        geographic = PointMetadata(**{**self.metadata.__dict__, "crs": "EPSG:4326"})
+        geographic = PointValueMetadata(**{**self.metadata.__dict__, "crs": "EPSG:4326"})
         for index, (contents, message) in enumerate(cases):
             with self.subTest(message=message):
                 path = self.root / f"invalid_{index}.txt"
@@ -103,10 +102,8 @@ class HeaderedPointTableSourceTests(unittest.TestCase):
         """Validate science metadata and forbid reads outside a managed scope."""
         path = self.root / "scope.txt"
         path.write_text("lon lat value\n1 2 3\n", encoding="utf-8")
-        invalid = PointMetadata(**{**self.metadata.__dict__, "crs": "not-a-crs"})
         with self.assertRaisesRegex(ValueError, "metadata CRS"):
-            with HeaderedPointTableSource(path, invalid):
-                pass
+            PointValueMetadata(**{**self.metadata.__dict__, "crs": "not-a-crs"})
 
         source = HeaderedPointTableSource(path, self.metadata)
         with self.assertRaisesRegex(RuntimeError, "not active"):

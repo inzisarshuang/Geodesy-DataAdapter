@@ -4,7 +4,7 @@ from .defsour import DefsourMetadata, DefsourPointBlock, DefsourPointSource
 from .gamma import GammaGeoGridSource
 from .licsbas import LiCSBASGridSource
 from .mintpy import MintPyGridSource
-from .text_points import HeaderedPointTableSource, PointValueBlock
+from .text_points import HeaderedPointTableSource, PointValueBlock, PointValueMetadata
 
 __all__ = [
     "DefsourMetadata",
@@ -15,4 +15,5 @@ __all__ = [
     "LiCSBASGridSource",
     "MintPyGridSource",
     "PointValueBlock",
+    "PointValueMetadata",
 ]

@@ -19,6 +19,7 @@ from .sources import (
     LiCSBASGridSource,
     MintPyGridSource,
     PointValueBlock,
+    PointValueMetadata,
 )
 
 __all__ = [
@@ -38,6 +39,7 @@ __all__ = [
     "PointMetadata",
     "PointQualitySpec",
     "PointValueBlock",
+    "PointValueMetadata",
     "convert_gamma_grid",
     "convert_licsbas_grid",
     "convert_mintpy_grid",

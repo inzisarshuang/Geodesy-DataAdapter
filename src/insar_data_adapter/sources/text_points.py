@@ -8,6 +8,8 @@ text_points
     参考信息均需明确；本模块不执行单位缩放、插值或持久格式导出。
 
 函数说明:
+    ``PointValueMetadata``:
+        保存通用点值表不可从字段名可靠推断的科学语义。
     ``PointValueBlock``:
         表示一个连续、受控大小的具名点值块。
     ``HeaderedPointTableSource``:
@@ -23,7 +25,38 @@ from typing import Iterator
 import numpy as np
 from pyproj import CRS, Transformer
 
-from ..points import PointMetadata
+
+
+def _required_text(value: str, field: str) -> str:
+    """Return one stripped required metadata value or reject an empty field."""
+    normalized = str(value).strip()
+    if not normalized:
+        raise ValueError(f"point-value metadata {field} must not be empty")
+    return normalized
+
+
+@dataclass(frozen=True)
+class PointValueMetadata:
+    """Describe the explicit meaning and provenance of a generic point-value table."""
+
+    source_format: str
+    value_unit: str
+    value_quantity: str
+    los_positive: str
+    crs: str
+    nodata_policy: str
+    temporal_reference: str
+    spatial_reference: str
+    source_provenance: str
+
+    def __post_init__(self) -> None:
+        """Require every source attribute and a valid CRS without inferring science."""
+        for field in self.__dataclass_fields__:
+            object.__setattr__(self, field, _required_text(getattr(self, field), field))
+        try:
+            CRS.from_user_input(self.crs)
+        except Exception as error:
+            raise ValueError(f"invalid point-value metadata CRS: {self.crs!r}") from error
 
 
 @dataclass(frozen=True)
@@ -56,7 +89,7 @@ class HeaderedPointTableSource:
     def __init__(
         self,
         path: str | Path,
-        metadata: PointMetadata,
+        metadata: PointValueMetadata,
         *,
         chunk_points: int = 250_000,
         x_column: str = "lon",
@@ -90,11 +123,6 @@ class HeaderedPointTableSource:
             raise ValueError("point-table X and Y column names must be distinct")
         if self.requested_value_column == "":
             raise ValueError("point-table value column name must not be empty")
-        self.metadata.validate()
-        try:
-            CRS.from_user_input(self.metadata.crs)
-        except Exception as error:
-            raise ValueError(f"invalid point-table metadata CRS: {self.metadata.crs!r}") from error
         self._read_header()
         self._active = True
         return self
