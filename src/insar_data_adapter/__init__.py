@@ -15,8 +15,10 @@ from .sources import (
     DefsourPointBlock,
     DefsourPointSource,
     GammaGeoGridSource,
+    HeaderedPointTableSource,
     LiCSBASGridSource,
     MintPyGridSource,
+    PointValueBlock,
 )
 
 __all__ = [
@@ -29,15 +31,17 @@ __all__ = [
     "DefsourPointBlock",
     "DefsourPointSource",
     "GammaGeoGridSource",
+    "HeaderedPointTableSource",
     "GridMetadata",
     "LiCSBASGridSource",
     "MintPyGridSource",
     "PointMetadata",
     "PointQualitySpec",
+    "PointValueBlock",
     "convert_gamma_grid",
     "convert_licsbas_grid",
     "convert_mintpy_grid",
     "detect_hdf5_format",
     "inspect_hdf5",
 ]
-__version__ = "0.9.0"
+__version__ = "0.10.0"

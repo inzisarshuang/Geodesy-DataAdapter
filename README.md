@@ -1,8 +1,8 @@
 # InSAR-Data-Adapter
 
-InSAR-Data-Adapter is the data-contract layer between scientific processing systems such as GAMMA, MintPy, LiCSBAS, and future PS/DS-InSAR workflows and consumers such as PyGMT-Plotter. Phase 1 provides read-only source inspection, Phase 2 adds bounded-memory canonical grid HDF5 I/O, Phases 3A–3C add strict MintPy, LiCSBAS, and geocoded GAMMA grid conversion, Phase 4A adds source-neutral PS/DS point HDF5 I/O, Phase 5A exposes grid geometry safely to visualization consumers, and Phase 5B adds bounded Defsour point-table ingestion with explicit CRS conversion.
+InSAR-Data-Adapter is the data-contract layer between scientific processing systems such as GAMMA, MintPy, LiCSBAS, and future PS/DS-InSAR workflows and consumers such as PyGMT-Plotter. It provides bounded source readers, canonical grid/point HDF5, strict conversions, safe grid geometry, and explicit Defsour plus headered point-table ingestion.
 
-InSAR-Data-Adapter 是 GAMMA、MintPy、LiCSBAS、后续 PS/DS-InSAR 等科学处理系统与 PyGMT-Plotter 等消费端之间的数据契约层。第一阶段提供来源只读检查，第二阶段增加受控内存的标准规则栅格 HDF5 读写，第三阶段 A–C 增加严格的 MintPy、LiCSBAS 与地理编码 GAMMA 规则栅格转换，第四阶段 A 增加与来源无关的 PS/DS 点 HDF5 读写，第五阶段 A 向可视化消费端安全公开网格几何信息，第五阶段 B 增加显式 CRS 转换的受控分块 Defsour 点表读取。
+InSAR-Data-Adapter 是 GAMMA、MintPy、LiCSBAS、后续 PS/DS-InSAR 等科学处理系统与 PyGMT-Plotter 等消费端之间的数据契约层，提供受控来源读取、标准栅格/点 HDF5、严格转换、安全网格几何，以及显式的 Defsour 和带表头点表读取。
 
 ## 1. Responsibilities / 职责
 
@@ -11,6 +11,7 @@ InSAR-Data-Adapter 是 GAMMA、MintPy、LiCSBAS、后续 PS/DS-InSAR 等科学�
 - Validate time dimensions, spatial dimensions, date vectors, units, and source-format expectations.<br>校验时间维、空间维、日期向量、单位和预期源格式。
 - Define separate canonical layouts for dense grids and sparse PS/DS points.<br>分别定义规则栅格与稀疏 PS/DS 点的标准布局。
 - Parse Defsour snapshots in bounded point blocks with explicit scientific metadata and optional CRS conversion.<br>使用显式科学元数据和可选 CRS 转换，按受控点块解析 Defsour 快照。
+- Parse named headered point-value snapshots without loading complete tables.<br>按具名表头解析点值快照，且不加载完整数据表。
 
 Radar-coordinate GAMMA input, source-specific PS/DS ingestion, Defsour/GRD/GeoTIFF exporters, and direct PyGMT rendering are intentionally deferred to later phases.
 
@@ -179,6 +180,8 @@ with CanonicalPointWriter(
 The complete PSI_WWQ/PSI_ZDN source mapping and cfg are intentionally assigned
 to Phase 4B after read-only source inspection.
 
+完整的 PSI_WWQ/PSI_ZDN 来源映射与 cfg 将在只读检查来源后于第四阶段 B 实现。
+
 ## 10. Defsour Point Source / Defsour 点表来源
 
 `DefsourPointSource` reads a headerless point snapshot without loading the
@@ -211,9 +214,42 @@ with DefsourPointSource("D20160512", metadata) as source:
         consume(block.x, block.y, block.height, block.deformation)
 ```
 
-完整的 PSI_WWQ/PSI_ZDN 来源映射与 cfg 将在只读检查来源后于第四阶段 B 实现。
+## 11. Headered Point-Value Source / 带表头点值来源
 
-## 10. Verification / 验证
+`HeaderedPointTableSource` reads named X, Y, and scientific value roles in
+bounded blocks. The default role names are `lon` and `lat`; callers should name
+the value field explicitly, while omission preserves the existing convention
+that the third header is the plotted value. Extra columns are retained in the
+source file but are not loaded.
+
+`HeaderedPointTableSource` 按受控分块读取具名 X、Y 和科学数值角色。默认坐标
+字段为 `lon` 与 `lat`；调用者应显式填写数值字段名，省略时则兼容现有“第三个
+表头为绘图值”约定。来源文件可保留额外字段，但读取器不会加载它们。
+
+```python
+from insar_data_adapter import HeaderedPointTableSource, PointMetadata
+
+metadata = PointMetadata(
+    source_format="headered_text_points",
+    deformation_unit="cm/yr",
+    deformation_quantity="velocity",
+    los_positive="toward_satellite",
+    crs="EPSG:4326",
+    nodata_policy="NaN is nodata; zero is valid",
+    temporal_reference="velocity interval in source manifest",
+    spatial_reference="none",
+    source_provenance="points.txt",
+    height_unit="not_applicable",
+)
+
+with HeaderedPointTableSource(
+    "points.txt", metadata, value_column="deformation_cm_per_year"
+) as source:
+    for block in source.iter_blocks():
+        consume(block.x, block.y, block.value)
+```
+
+## 12. Verification / 验证
 
 ```bash
 python -m compileall -q src tests

@@ -195,3 +195,29 @@ or interpolates points; those are named output/rendering boundaries.
 nodata 规则、时空参考和来源。`iter_blocks(target_crs=...)` 只在明确指定时执行
 一次 `always_xy` 坐标转换。来源读取器不缩放形变，也不进行点转栅格或插值；
 这些操作属于具名的输出或渲染边界。
+
+## 6. Headered Point-Value Source / 带表头点值来源
+
+`HeaderedPointTableSource` reads a whitespace-delimited point snapshot whose
+first non-comment row is a unique header. X and Y roles default to `lon` and
+`lat`; the value role is either an explicit header name or, for legacy
+compatibility, the third header. Role selection always uses names rather than
+assuming physical column positions. Comments, extra columns, NaN values, and
+bounded iteration are supported; coordinates must remain finite.
+
+`HeaderedPointTableSource` 读取以空白分隔的点快照，首个非注释行必须为字段名
+唯一的表头。X/Y 角色默认采用 `lon`/`lat`；数值角色可显式指定字段名，也可为兼容
+旧格式选用第三个表头。字段角色始终按名称选择，不假定其物理列位置。接口支持
+注释、额外列、NaN 数值及受控分块，但坐标必须保持有限。
+
+The source uses complete `PointMetadata`; units and a header name are not treated
+as interchangeable. A descriptive header such as `deformation_cm_per_year`
+helps humans audit a table, while `PointMetadata` remains the machine-validated
+contract for unit, quantity, CRS, LOS, nodata, temporal/spatial references, and
+provenance. Explicit `target_crs` conversion uses `always_xy`; value scaling and
+gridding remain separate named boundaries.
+
+来源使用完整 `PointMetadata`；单位与字段名不能相互替代。类似
+`deformation_cm_per_year` 的描述性字段名便于人工审查，而单位、物理量、CRS、
+LOS、nodata、时空参考和来源仍由可机器校验的 `PointMetadata` 负责。显式
+`target_crs` 转换采用 `always_xy`；数值缩放和制网仍是独立的具名边界。
