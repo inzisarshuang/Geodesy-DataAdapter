@@ -13,6 +13,7 @@ InSAR-Data-Adapter 是 GAMMA、MintPy、LiCSBAS、后续 PS/DS-InSAR 等科学�
 - Parse Defsour snapshots in bounded point blocks with explicit scientific metadata and optional CRS conversion.<br>使用显式科学元数据和可选 CRS 转换，按受控点块解析 Defsour 快照。
 - Export validated consecutive point blocks or masked 2-D grids to atomic four-column Defsour text without hidden transformations.<br>将已校验的连续点块或带掩膜二维网格原子导出为四列 Defsour 文本，不执行隐藏转换。
 - Aggregate valid cells in complete square grid windows using bounded mean or median blocks.<br>使用受控均值或中位数分块，聚合完整方形窗口内的有效像元。
+- Build Defsour grid validity from finite values, explicit sentinels, and an optional external mask without treating zero as nodata.<br>从有限值、显式哨兵值和可选外部掩膜构建 Defsour 网格有效性，不将零视为 nodata。
 - Parse named headered point-value snapshots without loading complete tables.<br>按具名表头解析点值快照，且不加载完整数据表。
 - Reproject and scale single-band GeoTIFFs with explicit metadata, nodata, resampling, and atomic output.<br>使用显式元数据、nodata、重采样和原子输出重投影及缩放单波段 GeoTIFF。
 
@@ -291,6 +292,13 @@ result = write_defsour_blocks(blocks, "D20240101", metadata)
 ```
 
 ## 14. Grid Aggregation / 网格聚合
+
+`build_defsour_valid_mask` combines finite X/Y/elevation/deformation checks,
+optional explicit DEM/deformation sentinels, and an optional external mask.
+Finite zero remains valid unless zero is explicitly configured as a sentinel.
+
+`build_defsour_valid_mask` 组合 X/Y/高程/形变有限性检查、可选的显式
+DEM/形变哨兵值和可选外部掩膜。除非将零显式设为哨兵值，有限零始终有效。
 
 `aggregate_grid_array` computes `mean` or `median` from explicitly valid cells
 in complete `factor × factor` windows. Incomplete bottom/right edges are dropped,

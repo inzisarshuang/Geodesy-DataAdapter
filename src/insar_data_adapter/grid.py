@@ -7,6 +7,8 @@ grid
     不缩放单位，不改变 CRS 或网格注册方式。
 
 函数说明:
+    ``build_defsour_valid_mask``:
+        组合坐标、高程、形变、显式 nodata 哨兵值和外部掩膜。
     ``aggregate_grid_array``:
         使用显式有效掩膜，按固定方形窗口计算均值或中位数。
 """
@@ -16,6 +18,27 @@ from __future__ import annotations
 import warnings
 
 import numpy as np
+
+
+def build_defsour_valid_mask(
+    x: np.ndarray,
+    y: np.ndarray,
+    dem: np.ndarray,
+    deform: np.ndarray,
+    nodata_dem: float | None = None,
+    nodata_deform: float | None = None,
+    valid_mask: np.ndarray | None = None,
+) -> np.ndarray:
+    """Combine finite values, explicit sentinels, and an optional external mask."""
+    valid = np.isfinite(dem) & np.isfinite(deform)
+    valid &= np.isfinite(x) & np.isfinite(y)
+    if nodata_dem is not None:
+        valid &= dem != nodata_dem
+    if nodata_deform is not None:
+        valid &= deform != nodata_deform
+    if valid_mask is not None:
+        valid &= valid_mask
+    return valid
 
 
 def aggregate_grid_array(

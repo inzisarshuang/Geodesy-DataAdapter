@@ -43,7 +43,7 @@ GAMMA / MintPy / PS-DS-InSAR
 7. Formalize named, headered point-value ingestion before replacing Visualization's legacy TXT parsing (6B source contract). Preserve descriptive value headers while keeping scientific metadata independently explicit.<br>在替换 Visualization 的旧 TXT 解析前，先规范具名、带表头的点值读取（6B 来源契约）；保留描述性数值字段名，同时独立显式记录科学元数据。
 8. Separate GeoTIFF adaptation from GMT rendering (6C): Adapter owns explicit CRS, resampling, nodata, scaling, provenance, and atomic GeoTIFF output; Visualization may consume that output for temporary GRD preparation.<br>将 GeoTIFF 适配与 GMT 渲染拆分（6C）：Adapter 负责显式 CRS、重采样、nodata、缩放、来源及原子 GeoTIFF 输出；Visualization 可消费该输出准备临时 GRD。
 9. Add persistent exchange exporters in bounded phases (7A): accept validated consecutive point blocks or equal-shape masked grids and write Defsour text atomically without reading or transforming source products.<br>分阶段增加持久交换格式 exporter（7A）：接收已校验的连续点块或同形带掩膜网格，原子写出 Defsour 文本，不读取或转换来源产品。
-10. Move reusable grid transforms in bounded phases (7B): first preserve the existing valid-cell square-window mean/median behavior as a source-neutral numerical API; keep CRS/profile changes and workflow factor selection separate.<br>分阶段迁移可复用网格变换（7B）：先将现有有效像元方形窗口均值/中位数行为保留为来源中立数值 API；CRS/profile 变化与工作流倍数选择仍保持独立。
+10. Move reusable grid transforms in bounded phases (7B): preserve explicit Defsour validity-mask composition and valid-cell square-window mean/median behavior as source-neutral numerical APIs; keep CRS/profile changes and workflow factor selection separate.<br>分阶段迁移可复用网格变换（7B）：将显式 Defsour 有效掩膜组合与有效像元方形窗口均值/中位数行为保留为来源中立数值 API；CRS/profile 变化与工作流倍数选择仍保持独立。
 
 No phase should require a broad rewrite of an upstream processing repository.
 

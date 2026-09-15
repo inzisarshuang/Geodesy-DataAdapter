@@ -6,7 +6,40 @@ import unittest
 
 import numpy as np
 
-from insar_data_adapter import aggregate_grid_array
+from insar_data_adapter import aggregate_grid_array, build_defsour_valid_mask
+
+
+class DefsourValidityTests(unittest.TestCase):
+    """Preserve finite-value, sentinel, mask, and zero-value behavior."""
+
+    def test_combines_every_explicit_invalidity_source(self) -> None:
+        """Exclude non-finite values, configured sentinels, and false mask cells."""
+        x = np.array([[0.0, 1.0, np.nan], [3.0, 4.0, 5.0]])
+        y = np.array([[0.0, 1.0, 2.0], [np.inf, 4.0, 5.0]])
+        dem = np.array([[0.0, -9999.0, 2.0], [3.0, 4.0, 5.0]])
+        deform = np.array([[0.0, 1.0, 2.0], [3.0, -8888.0, 5.0]])
+        external = np.array([[True, True, True], [True, True, False]])
+        actual = build_defsour_valid_mask(
+            x,
+            y,
+            dem,
+            deform,
+            nodata_dem=-9999.0,
+            nodata_deform=-8888.0,
+            valid_mask=external,
+        )
+        np.testing.assert_array_equal(
+            actual,
+            [[True, False, False], [False, False, False]],
+        )
+
+    def test_zero_is_valid_without_an_explicit_zero_sentinel(self) -> None:
+        """Never reinterpret finite zero coordinates or measurements as nodata."""
+        zeros = np.zeros((2, 2), dtype=np.float32)
+        np.testing.assert_array_equal(
+            build_defsour_valid_mask(zeros, zeros, zeros, zeros),
+            np.ones((2, 2), dtype=bool),
+        )
 
 
 class GridAggregationTests(unittest.TestCase):

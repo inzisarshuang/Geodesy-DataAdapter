@@ -262,6 +262,15 @@ rejects empty input unless `allow_empty=True` is explicit.
 
 ## 8. Grid Aggregation Boundary / 网格聚合边界
 
+`build_defsour_valid_mask` defines the reusable pre-export validity rule. X, Y,
+elevation, and deformation must all be finite; configured elevation/deformation
+sentinels and false cells in an optional external mask are excluded. No implicit
+sentinel exists, so finite zero coordinates, heights, and deformation remain valid.
+
+`build_defsour_valid_mask` 定义可复用的导出前有效性规则。X、Y、高程与形变必须全部
+有限；已配置的高程/形变哨兵值以及可选外部掩膜中的 false 像元被排除。接口不设
+隐式哨兵值，因此有限的零坐标、零高程和零形变仍为有效值。
+
 `aggregate_grid_array` accepts one numeric 2-D array and one equal-shape explicit
 validity mask. It aggregates complete non-overlapping square windows by `mean`
 or `median`, drops incomplete bottom/right edges, emits float64 NaN for windows
