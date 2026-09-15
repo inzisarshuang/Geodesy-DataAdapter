@@ -1,8 +1,8 @@
 # InSAR-Data-Adapter
 
-InSAR-Data-Adapter is the data-contract layer between scientific processing systems such as GAMMA, MintPy, LiCSBAS, and future PS/DS-InSAR workflows and consumers such as PyGMT-Plotter. It provides bounded source readers, canonical grid/point HDF5, strict conversions, safe grid geometry, explicit point-table ingestion, and atomic Defsour export.
+InSAR-Data-Adapter is the data-contract layer between scientific processing systems such as GAMMA, MintPy, LiCSBAS, and future PS/DS-InSAR workflows and consumers such as PyGMT-Plotter. It provides bounded source readers, canonical grid/point HDF5, strict conversions, safe grid geometry and aggregation, explicit point-table ingestion, and atomic Defsour export.
 
-InSAR-Data-Adapter 是 GAMMA、MintPy、LiCSBAS、后续 PS/DS-InSAR 等科学处理系统与 PyGMT-Plotter 等消费端之间的数据契约层，提供受控来源读取、标准栅格/点 HDF5、严格转换、安全网格几何、显式点表读取及原子 Defsour 导出。
+InSAR-Data-Adapter 是 GAMMA、MintPy、LiCSBAS、后续 PS/DS-InSAR 等科学处理系统与 PyGMT-Plotter 等消费端之间的数据契约层，提供受控来源读取、标准栅格/点 HDF5、严格转换、安全网格几何与聚合、显式点表读取及原子 Defsour 导出。
 
 ## 1. Responsibilities / 职责
 
@@ -12,12 +12,13 @@ InSAR-Data-Adapter 是 GAMMA、MintPy、LiCSBAS、后续 PS/DS-InSAR 等科学�
 - Define separate canonical layouts for dense grids and sparse PS/DS points.<br>分别定义规则栅格与稀疏 PS/DS 点的标准布局。
 - Parse Defsour snapshots in bounded point blocks with explicit scientific metadata and optional CRS conversion.<br>使用显式科学元数据和可选 CRS 转换，按受控点块解析 Defsour 快照。
 - Export validated consecutive point blocks or masked 2-D grids to atomic four-column Defsour text without hidden transformations.<br>将已校验的连续点块或带掩膜二维网格原子导出为四列 Defsour 文本，不执行隐藏转换。
+- Aggregate valid cells in complete square grid windows using bounded mean or median blocks.<br>使用受控均值或中位数分块，聚合完整方形窗口内的有效像元。
 - Parse named headered point-value snapshots without loading complete tables.<br>按具名表头解析点值快照，且不加载完整数据表。
 - Reproject and scale single-band GeoTIFFs with explicit metadata, nodata, resampling, and atomic output.<br>使用显式元数据、nodata、重采样和原子输出重投影及缩放单波段 GeoTIFF。
 
-Radar-coordinate GAMMA input, source-specific PS/DS ingestion, GRD export, canonical-to-GeoTIFF export, and direct PyGMT rendering are intentionally deferred to later phases. Defsour 7A currently exposes a Python writer only; source-specific CLI delegation remains gated by shadow comparison.
+Radar-coordinate GAMMA input, source-specific PS/DS ingestion, GRD export, canonical-to-GeoTIFF export, and direct PyGMT rendering are intentionally deferred to later phases. Defsour publication and grid aggregation expose source-neutral Python APIs; source-specific workflow orchestration remains upstream.
 
-雷达坐标 GAMMA 输入、特定来源的 PS/DS 接入、GRD 导出、标准产品到 GeoTIFF 导出及直接 PyGMT 渲染明确留到后续阶段。Defsour 7A 当前只提供 Python writer；来源专用 CLI 委托仍需先通过影子对照。
+雷达坐标 GAMMA 输入、特定来源的 PS/DS 接入、GRD 导出、标准产品到 GeoTIFF 导出及直接 PyGMT 渲染明确留到后续阶段。Defsour 发布与网格聚合提供来源中立的 Python API；特定来源的工作流编排仍保留在上游。
 
 ## 2. Installation / 安装
 
@@ -289,7 +290,18 @@ metadata = DefsourExportMetadata(
 result = write_defsour_blocks(blocks, "D20240101", metadata)
 ```
 
-## 14. Verification / 验证
+## 14. Grid Aggregation / 网格聚合
+
+`aggregate_grid_array` computes `mean` or `median` from explicitly valid cells
+in complete `factor × factor` windows. Incomplete bottom/right edges are dropped,
+empty windows become NaN, output is float64, and `block_output_rows` bounds
+temporary memory. The operation does not alter units, CRS, or registration.
+
+`aggregate_grid_array` 只对完整的 `factor × factor` 窗口中显式有效的像元
+计算 `mean` 或 `median`。底部/右侧不完整边缘会被舍弃，空窗口输出 NaN，
+输出为 float64，`block_output_rows` 限制临时内存。该操作不改变单位、CRS 或注册方式。
+
+## 15. Verification / 验证
 
 ```bash
 python -m compileall -q src tests

@@ -259,3 +259,24 @@ rejects empty input unless `allow_empty=True` is explicit.
 发布保证仍完全由 `write_defsour_blocks` 定义。
 零选中像元的网格会为了兼容性原子发布空历元文件；直接点块导出仍默认
 拒绝空输入，除非显式设置 `allow_empty=True`。
+
+## 8. Grid Aggregation Boundary / 网格聚合边界
+
+`aggregate_grid_array` accepts one numeric 2-D array and one equal-shape explicit
+validity mask. It aggregates complete non-overlapping square windows by `mean`
+or `median`, drops incomplete bottom/right edges, emits float64 NaN for windows
+with no valid cells, and processes at most `block_output_rows` output rows per
+temporary block. Values marked invalid never participate, even when finite.
+
+`aggregate_grid_array` 接收一个数值二维数组和一个同形显式有效掩膜。
+它以 `mean` 或 `median` 聚合完整、不重叠的方形窗口，舍弃底部/右侧不完整边缘，
+无有效像元的窗口输出 float64 NaN，且每个临时块最多处理
+`block_output_rows` 个输出行。标为无效的数值即使有限也绝不参与统计。
+
+This numerical boundary does not infer or modify units, CRS, pixel/gridline
+registration, coordinates, nodata meaning, or provenance. Callers remain
+responsible for recording their selected factor, method, edge policy, and all
+scientific metadata at the persistent output boundary.
+
+该数值边界不推断或修改单位、CRS、pixel/gridline 注册、坐标、nodata 语义或来源。
+调用方仍必须在持久输出边界记录所选倍数、方法、边缘规则和全部科学元数据。
