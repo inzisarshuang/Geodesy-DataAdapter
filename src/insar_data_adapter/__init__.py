@@ -24,6 +24,7 @@ from .points import (
     PointMetadata,
     PointQualitySpec,
 )
+from .raster import reproject_static_grid_to_profile
 from .sources import (
     DefsourMetadata,
     DefsourPointBlock,
@@ -61,6 +62,7 @@ __all__ = [
     "PointQualitySpec",
     "PointValueBlock",
     "PointValueMetadata",
+    "reproject_static_grid_to_profile",
     "convert_gamma_grid",
     "convert_geotiff_raster",
     "convert_licsbas_grid",
@@ -70,4 +72,4 @@ __all__ = [
     "write_defsour_blocks",
     "write_defsour_grid",
 ]
-__version__ = "0.15.0"
+__version__ = "0.16.0"

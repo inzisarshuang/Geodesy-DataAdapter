@@ -299,3 +299,25 @@ scientific metadata at the persistent output boundary.
 
 该数值边界不推断或修改单位、CRS、pixel/gridline 注册、坐标、nodata 语义或来源。
 调用方仍必须在持久输出边界记录所选倍数、方法、边缘规则和全部科学元数据。
+
+## 9. Profile-Aware Raster Reprojection / Profile 驱动的栅格重投影
+
+`reproject_static_grid_to_profile` accepts one numeric two-dimensional grid, an
+equal-shape explicit validity mask, and complete source/destination Rasterio
+profiles supplied by the caller. Values are converted to float32 and reprojected
+with bilinear resampling; validity is reprojected independently with nearest
+neighbour resampling. A destination cell is valid only when the reprojected mask
+is greater than 0.5 and the numeric result is finite; all other output values are
+NaN.
+
+`reproject_static_grid_to_profile` 接收一个二维数值网格、同形显式有效掩膜，以及
+由调用方提供的完整源/目标 Rasterio profile。数值转换为 float32 后采用双线性
+重投影；有效掩膜独立采用最近邻重投影。仅当重投影掩膜大于 0.5 且数值结果有限时，
+目标像元才有效；其余输出值均为 NaN。
+
+This API does not read or write files and does not infer CRS, transform, nodata,
+units, registration, or provenance. Those semantics remain explicit caller and
+persistent-output responsibilities.
+
+该 API 不读写文件，也不推断 CRS、transform、nodata、单位、注册方式或来源；
+这些语义仍由调用方显式提供，并在持久产品边界记录。

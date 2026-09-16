@@ -319,7 +319,20 @@ caller responsibilities.
 均为有限数时将输出像元标为有效。倍数为一时直接返回原数组，不产生副本。倍数选择、
 坐标生成、CRS 变换和产品发布仍由调用方负责。
 
-## 15. Verification / 验证
+## 15. Profile-Aware Raster Reprojection / Profile 驱动的栅格重投影
+
+`reproject_static_grid_to_profile` maps one static numeric grid and its explicit
+validity mask between caller-supplied Rasterio profiles. Numeric values use
+bilinear resampling, validity uses nearest-neighbour resampling, and output is
+float32 with NaN outside the resulting valid area. The API does not infer CRS,
+nodata, units, registration, or profiles, and it performs no file I/O.
+
+`reproject_static_grid_to_profile` 根据调用方显式提供的 Rasterio profile，重投影
+一个静态数值网格及其有效掩膜。数值采用双线性重采样，有效掩膜采用最近邻重采样；
+输出为 float32，结果有效区之外为 NaN。该 API 不推断 CRS、nodata、单位、注册方式
+或 profile，也不执行文件 I/O。
+
+## 16. Verification / 验证
 
 ```bash
 python -m compileall -q src tests
