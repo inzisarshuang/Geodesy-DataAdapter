@@ -11,6 +11,8 @@ defsour_export
         保存文本列本身无法表达且禁止推断的输出科学语义。
     ``DefsourExportResult``:
         返回已发布文件、点数和显式元数据。
+    ``infer_deformation_unit_label``:
+        根据从米到输出值的显式倍率生成兼容单位标签。
     ``write_defsour_blocks``:
         校验连续点块并原子写出四列 Defsour 文本。
     ``write_defsour_grid``:
@@ -78,6 +80,18 @@ class DefsourExportResult:
     output_path: Path
     point_count: int
     metadata: DefsourExportMetadata
+
+
+def infer_deformation_unit_label(deformation_scale: float) -> str:
+    """Return the established output-unit label for a scale from metres."""
+    scale = float(deformation_scale)
+    if np.isclose(scale, 1.0):
+        return "m"
+    if np.isclose(scale, 100.0):
+        return "cm"
+    if np.isclose(scale, 1000.0):
+        return "mm"
+    return f"scaled_from_m_by_{scale:g}"
 
 
 def _validate_format(fmt: str) -> str:

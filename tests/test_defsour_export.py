@@ -11,6 +11,7 @@ import numpy as np
 from insar_data_adapter import (
     DefsourExportMetadata,
     DefsourPointBlock,
+    infer_deformation_unit_label,
     write_defsour_blocks,
     write_defsour_grid,
 )
@@ -32,6 +33,18 @@ class DefsourExportTests(unittest.TestCase):
             spatial_reference="radar row 2 column 3, zero-based",
             source_provenance="synthetic Defsour exporter test",
         )
+
+    def test_deformation_unit_label_preserves_legacy_scale_mapping(self) -> None:
+        """Map meter scale factors to the established human-readable labels."""
+        cases = (
+            (1.0, "m"),
+            (100.0, "cm"),
+            (1000.0, "mm"),
+            (2.5, "scaled_from_m_by_2.5"),
+        )
+        for scale, expected in cases:
+            with self.subTest(scale=scale):
+                self.assertEqual(infer_deformation_unit_label(scale), expected)
 
     @staticmethod
     def block(

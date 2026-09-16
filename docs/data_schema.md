@@ -247,6 +247,14 @@ four numeric columns. A failed stream never replaces an existing destination.
 无穷、覆盖语义不明确，以及不能生成恰好四个数值列的格式；流式写出失败时不会
 替换已有目标。
 
+`infer_deformation_unit_label` maps an already selected scale from metres to the
+legacy labels `m`, `cm`, or `mm`, and names other factors explicitly. It neither
+changes array values nor supplies the remaining `DefsourExportMetadata` fields.
+
+`infer_deformation_unit_label` 将已经选定的米制倍率映射为旧标签 `m`、`cm` 或
+`mm`，并显式命名其他倍率。它既不修改数组值，也不补全其余
+`DefsourExportMetadata` 字段。
+
 `write_defsour_grid` adds only a bounded row-major grid-to-block mapping. The
 caller supplies equal-shape X/Y/height/deformation/mask arrays and explicitly
 chooses whether selected NaN payloads are retained; all publication guarantees

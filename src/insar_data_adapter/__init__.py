@@ -12,6 +12,7 @@ from .converters import (
 from .exporters import (
     DefsourExportMetadata,
     DefsourExportResult,
+    infer_deformation_unit_label,
     write_defsour_blocks,
     write_defsour_grid,
 )
@@ -57,6 +58,7 @@ __all__ = [
     "GammaGeoGridSource",
     "GeoTiffConversionResult",
     "GeoTiffValueMetadata",
+    "infer_deformation_unit_label",
     "HeaderedPointTableSource",
     "GridMetadata",
     "LiCSBASGridSource",
@@ -76,4 +78,4 @@ __all__ = [
     "write_defsour_blocks",
     "write_defsour_grid",
 ]
-__version__ = "0.17.0"
+__version__ = "0.18.0"

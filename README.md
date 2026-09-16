@@ -274,6 +274,15 @@ mandatory, and neither API performs hidden source conversion.
 `write_defsour_grid` 将同一契约按受控行块应用于同形二维数组。两个接口都强制
 提供完整科学元数据，不执行任何隐藏的来源转换。
 
+`infer_deformation_unit_label` preserves compatibility labels for explicit
+scales from metres (`1` → `m`, `100` → `cm`, and `1000` → `mm`). Other scales
+receive an honest `scaled_from_m_by_<factor>` label. It does not scale values or
+replace explicit scientific metadata.
+
+`infer_deformation_unit_label` 保留从米缩放时的兼容标签（`1` → `m`、`100` →
+`cm`、`1000` → `mm`）。其他倍率使用诚实的 `scaled_from_m_by_<factor>` 标签；
+它不缩放数值，也不能代替显式科学元数据。
+
 ```python
 from insar_data_adapter import DefsourExportMetadata, write_defsour_blocks
 

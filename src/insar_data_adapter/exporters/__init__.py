@@ -13,6 +13,7 @@ exporters
 from .defsour import (
     DefsourExportMetadata,
     DefsourExportResult,
+    infer_deformation_unit_label,
     write_defsour_blocks,
     write_defsour_grid,
 )
@@ -21,6 +22,7 @@ from .defsour import (
 __all__ = [
     "DefsourExportMetadata",
     "DefsourExportResult",
+    "infer_deformation_unit_label",
     "write_defsour_blocks",
     "write_defsour_grid",
 ]
