@@ -332,6 +332,18 @@ nodata, units, registration, or profiles, and it performs no file I/O.
 输出为 float32，结果有效区之外为 NaN。该 API 不推断 CRS、nodata、单位、注册方式
 或 profile，也不执行文件 I/O。
 
+`reproject_downsampled_grid_to_profile` applies the same explicit-profile
+contract to DEM and deformation grids sharing one validity mask. Both numeric
+grids use bilinear resampling, while validity uses nearest-neighbour resampling;
+a destination cell is valid only when both numeric results are finite. For the
+legacy aligned-grid path, incomplete georeferencing is accepted only when the
+source and destination shapes match, and independent copies are returned.
+
+`reproject_downsampled_grid_to_profile` 将同一显式 profile 契约用于共用有效掩膜的
+DEM 与形变网格。两个数值网格均采用双线性重采样，有效掩膜采用最近邻重采样；仅当
+两个数值结果均有限时目标像元才有效。旧的对齐网格路径允许 profile 缺少地理参考，
+但源/目标形状必须一致，并返回三个独立副本。
+
 ## 16. Verification / 验证
 
 ```bash

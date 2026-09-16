@@ -315,6 +315,19 @@ NaN.
 重投影；有效掩膜独立采用最近邻重投影。仅当重投影掩膜大于 0.5 且数值结果有限时，
 目标像元才有效；其余输出值均为 NaN。
 
+`reproject_downsampled_grid_to_profile` accepts DEM and deformation grids that
+share one explicit validity mask. Both values are converted to float32 and use
+bilinear reprojection; the mask uses nearest-neighbour reprojection. Output
+validity additionally requires both reprojected values to be finite. If either
+profile lacks CRS or transform, the legacy aligned-grid fallback returns
+independent copies only when source and destination shapes match; otherwise it
+raises `ValueError`.
+
+`reproject_downsampled_grid_to_profile` 接收共用一个显式有效掩膜的 DEM 与形变网格。
+两个数值均转换为 float32 并采用双线性重投影；掩膜采用最近邻重投影。输出有效性还
+要求两个重投影数值均为有限数。如果任一 profile 缺少 CRS 或 transform，则旧的对齐
+网格回退仅在源/目标形状一致时返回独立副本，否则抛出 `ValueError`。
+
 This API does not read or write files and does not infer CRS, transform, nodata,
 units, registration, or provenance. Those semantics remain explicit caller and
 persistent-output responsibilities.
