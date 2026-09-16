@@ -11,6 +11,8 @@ grid
         组合坐标、高程、形变、显式 nodata 哨兵值和外部掩膜。
     ``aggregate_grid_array``:
         使用显式有效掩膜，按固定方形窗口计算均值或中位数。
+    ``downsample_data_grid``:
+        使用同一有效掩膜聚合高程与形变，并生成低分辨率有效掩膜。
 """
 
 from __future__ import annotations
@@ -109,3 +111,22 @@ def aggregate_grid_array(
                     median_values, axis=(1, 3)
                 )
     return output
+
+
+def downsample_data_grid(
+    dem: np.ndarray,
+    deform: np.ndarray,
+    valid: np.ndarray,
+    factor: int,
+    method: str,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Aggregate DEM and deformation with one explicit validity mask."""
+    factor = int(factor)
+    if factor < 1:
+        raise ValueError("grid_downsample_factor must be >= 1")
+    if factor == 1:
+        return dem, deform, valid
+    dem_out = aggregate_grid_array(dem, valid, factor, method)
+    deform_out = aggregate_grid_array(deform, valid, factor, method)
+    valid_out = np.isfinite(dem_out) & np.isfinite(deform_out)
+    return dem_out, deform_out, valid_out

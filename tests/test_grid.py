@@ -6,7 +6,11 @@ import unittest
 
 import numpy as np
 
-from insar_data_adapter import aggregate_grid_array, build_defsour_valid_mask
+from insar_data_adapter import (
+    aggregate_grid_array,
+    build_defsour_valid_mask,
+    downsample_data_grid,
+)
 
 
 class DefsourValidityTests(unittest.TestCase):
@@ -44,6 +48,26 @@ class DefsourValidityTests(unittest.TestCase):
 
 class GridAggregationTests(unittest.TestCase):
     """Preserve aggregation values, edge policy, and validation."""
+
+    def test_downsample_data_grid_uses_one_mask_for_all_outputs(self) -> None:
+        """Aggregate DEM/deformation together and derive the finite output mask."""
+        dem = np.array(
+            [[1.0, 2.0, 10.0, 14.0], [3.0, 100.0, 18.0, 22.0]]
+        )
+        deform = np.array(
+            [[2.0, 4.0, 20.0, 28.0], [6.0, 200.0, 36.0, 44.0]]
+        )
+        valid = np.array(
+            [[True, True, False, False], [True, False, False, False]]
+        )
+
+        dem_out, deform_out, valid_out = downsample_data_grid(
+            dem, deform, valid, factor=2, method="mean"
+        )
+
+        np.testing.assert_allclose(dem_out, [[2.0, np.nan]], equal_nan=True)
+        np.testing.assert_allclose(deform_out, [[4.0, np.nan]], equal_nan=True)
+        np.testing.assert_array_equal(valid_out, [[True, False]])
 
     def test_mean_and_median_match_full_window_reference(self) -> None:
         """Match NumPy references across multiple bounded output blocks."""

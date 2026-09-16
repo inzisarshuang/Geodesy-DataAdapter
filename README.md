@@ -309,6 +309,16 @@ temporary memory. The operation does not alter units, CRS, or registration.
 计算 `mean` 或 `median`。底部/右侧不完整边缘会被舍弃，空窗口输出 NaN，
 输出为 float64，`block_output_rows` 限制临时内存。该操作不改变单位、CRS 或注册方式。
 
+`downsample_data_grid` applies that same explicit validity mask to elevation and
+deformation, then marks an output cell valid only when both aggregated values are
+finite. A factor of one returns the original arrays without copying. Factor
+selection, coordinate generation, CRS changes, and output publication remain
+caller responsibilities.
+
+`downsample_data_grid` 对高程和形变使用同一个显式有效掩膜，并且仅在两个聚合值
+均为有限数时将输出像元标为有效。倍数为一时直接返回原数组，不产生副本。倍数选择、
+坐标生成、CRS 变换和产品发布仍由调用方负责。
+
 ## 15. Verification / 验证
 
 ```bash

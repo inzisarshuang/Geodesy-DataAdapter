@@ -16,7 +16,7 @@ from .exporters import (
     write_defsour_grid,
 )
 from .hdf5 import detect_hdf5_format, inspect_hdf5
-from .grid import aggregate_grid_array, build_defsour_valid_mask
+from .grid import aggregate_grid_array, build_defsour_valid_mask, downsample_data_grid
 from .model import DatasetSummary
 from .points import (
     CanonicalPointReader,
@@ -39,6 +39,7 @@ from .sources import (
 __all__ = [
     "aggregate_grid_array",
     "build_defsour_valid_mask",
+    "downsample_data_grid",
     "CanonicalGridReader",
     "CanonicalGridWriter",
     "CanonicalPointReader",
@@ -69,4 +70,4 @@ __all__ = [
     "write_defsour_blocks",
     "write_defsour_grid",
 ]
-__version__ = "0.14.0"
+__version__ = "0.15.0"

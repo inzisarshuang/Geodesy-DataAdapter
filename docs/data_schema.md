@@ -282,6 +282,16 @@ temporary block. Values marked invalid never participate, even when finite.
 无有效像元的窗口输出 float64 NaN，且每个临时块最多处理
 `block_output_rows` 个输出行。标为无效的数值即使有限也绝不参与统计。
 
+`downsample_data_grid` composes two calls to that aggregation contract using one
+explicit validity mask for both elevation and deformation. Its output mask is true
+only where both aggregated arrays are finite. A factor of one preserves the three
+input array objects; coordinate/profile transforms and factor selection are not
+part of this API.
+
+`downsample_data_grid` 使用同一个显式有效掩膜分别调用两次上述聚合契约，处理高程
+与形变；仅当两个聚合数组均为有限值时，输出掩膜才为 true。倍数为一时保留三个输入
+数组对象；坐标/profile 变换与倍数选择不属于该 API。
+
 This numerical boundary does not infer or modify units, CRS, pixel/gridline
 registration, coordinates, nodata meaning, or provenance. Callers remain
 responsible for recording their selected factor, method, edge policy, and all
