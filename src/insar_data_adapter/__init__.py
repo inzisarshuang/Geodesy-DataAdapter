@@ -34,11 +34,16 @@ from .sources import (
     DefsourPointBlock,
     DefsourPointSource,
     GammaGeoGridSource,
+    gamma_par_shape,
     HeaderedPointTableSource,
     LiCSBASGridSource,
     MintPyGridSource,
     PointValueBlock,
     PointValueMetadata,
+    radar_indices_from_lookup,
+    read_binary_raster,
+    read_complex_binary_raster,
+    read_gamma_par_value,
 )
 
 __all__ = [
@@ -56,6 +61,7 @@ __all__ = [
     "DefsourPointBlock",
     "DefsourPointSource",
     "GammaGeoGridSource",
+    "gamma_par_shape",
     "GeoTiffConversionResult",
     "GeoTiffValueMetadata",
     "infer_deformation_unit_label",
@@ -67,6 +73,10 @@ __all__ = [
     "PointQualitySpec",
     "PointValueBlock",
     "PointValueMetadata",
+    "radar_indices_from_lookup",
+    "read_binary_raster",
+    "read_complex_binary_raster",
+    "read_gamma_par_value",
     "reproject_downsampled_grid_to_profile",
     "reproject_static_grid_to_profile",
     "convert_gamma_grid",
@@ -78,4 +88,4 @@ __all__ = [
     "write_defsour_blocks",
     "write_defsour_grid",
 ]
-__version__ = "0.18.0"
+__version__ = "0.19.0"

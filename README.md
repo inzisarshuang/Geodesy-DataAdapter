@@ -17,9 +17,18 @@ Geodesy-Data-Adapter 是 GAMMA、MintPy、LiCSBAS、后续 PS/DS-InSAR 等科学
 - Parse named headered point-value snapshots without loading complete tables.<br>按具名表头解析点值快照，且不加载完整数据表。
 - Reproject and scale single-band GeoTIFFs with explicit metadata, nodata, resampling, and atomic output.<br>使用显式元数据、nodata、重采样和原子输出重投影及缩放单波段 GeoTIFF。
 
-Radar-coordinate GAMMA input, source-specific PS/DS ingestion, GRD export, canonical-to-GeoTIFF export, and direct PyGMT rendering are intentionally deferred to later phases. Defsour publication and grid aggregation expose source-neutral Python APIs; source-specific workflow orchestration remains upstream.
+Complete radar-coordinate GAMMA conversion, source-specific PS/DS ingestion, GRD export, canonical-to-GeoTIFF export, and direct PyGMT rendering are intentionally deferred to later phases. Defsour publication and grid aggregation expose source-neutral Python APIs; source-specific workflow orchestration remains upstream.
 
-雷达坐标 GAMMA 输入、特定来源的 PS/DS 接入、GRD 导出、标准产品到 GeoTIFF 导出及直接 PyGMT 渲染明确留到后续阶段。Defsour 发布与网格聚合提供来源中立的 Python API；特定来源的工作流编排仍保留在上游。
+完整雷达坐标 GAMMA 转换、特定来源的 PS/DS 接入、GRD 导出、标准产品到 GeoTIFF 导出及直接 PyGMT 渲染明确留到后续阶段。Defsour 发布与网格聚合提供来源中立的 Python API；特定来源的工作流编排仍保留在上游。
+
+Adapter 0.19 exposes strict read-only GAMMA radar primitives for parameter
+shapes, explicit real/complex binary rasters, and geographic-lookup sampling.
+These APIs adapt source representation only; they do not perform interferometric
+analysis or define a complete radar-coordinate converter.
+
+Adapter 0.19 提供严格只读的 GAMMA 雷达源接口，用于参数尺寸、显式实数/复数
+二进制栅格及地理 lookup 抽样。这些接口只适配来源表示，不执行干涉分析，也不
+构成完整的雷达坐标转换器。
 
 ## 2. Installation / 安装
 
