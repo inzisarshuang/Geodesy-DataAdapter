@@ -1,4 +1,4 @@
-# InSAR-Data-Adapter Coding Baseline
+# Geodesy-Data-Adapter Coding Baseline
 
 Read `docs/architecture.md`, `docs/data_schema.md`, and `docs/cfg_contract.md`
 before changing public interfaces or scientific metadata.

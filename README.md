@@ -1,8 +1,8 @@
-# InSAR-Data-Adapter
+# Geodesy-Data-Adapter
 
-InSAR-Data-Adapter is the data-contract layer between scientific processing systems such as GAMMA, MintPy, LiCSBAS, and future PS/DS-InSAR workflows and consumers such as PyGMT-Plotter. It provides bounded source readers, canonical grid/point HDF5, strict conversions, safe grid geometry and aggregation, explicit point-table ingestion, and atomic Defsour export.
+Geodesy-Data-Adapter is the data-contract layer between scientific processing systems such as GAMMA, MintPy, LiCSBAS, and future PS/DS-InSAR workflows and consumers such as Geodesy-Visualization. It provides bounded source readers, canonical grid/point HDF5, strict conversions, safe grid geometry and aggregation, explicit point-table ingestion, and atomic Defsour export.
 
-InSAR-Data-Adapter 是 GAMMA、MintPy、LiCSBAS、后续 PS/DS-InSAR 等科学处理系统与 PyGMT-Plotter 等消费端之间的数据契约层，提供受控来源读取、标准栅格/点 HDF5、严格转换、安全网格几何与聚合、显式点表读取及原子 Defsour 导出。
+Geodesy-Data-Adapter 是 GAMMA、MintPy、LiCSBAS、后续 PS/DS-InSAR 等科学处理系统与 Geodesy-Visualization 等消费端之间的数据契约层，提供受控来源读取、标准栅格/点 HDF5、严格转换、安全网格几何与聚合、显式点表读取及原子 Defsour 导出。
 
 ## 1. Responsibilities / 职责
 
