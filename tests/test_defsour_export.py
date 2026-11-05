@@ -104,15 +104,14 @@ class DefsourExportTests(unittest.TestCase):
             self.assertEqual(output.read_text(encoding="ascii"), "existing\n")
             self.assertEqual(list(output.parent.glob(f".{output.name}.*.tmp")), [])
 
-    def test_rejects_existing_output_empty_input_and_invalid_blocks(self) -> None:
-        """Reject ambiguous replacement, missing points, CRS conflicts, and infinity."""
+    def test_rejects_empty_input_and_invalid_blocks_without_losing_existing(self) -> None:
+        """Reject missing points, CRS conflicts, and infinity without losing output."""
         with tempfile.TemporaryDirectory() as tmp:
             output = Path(tmp) / "D20240101"
             output.write_text("existing\n", encoding="ascii")
-            with self.assertRaises(FileExistsError):
-                write_defsour_blocks([], output, self.metadata)
             with self.assertRaisesRegex(ValueError, "at least one"):
-                write_defsour_blocks([], output, self.metadata, overwrite=True)
+                write_defsour_blocks([], output, self.metadata)
+            self.assertEqual(output.read_text(encoding="ascii"), "existing\n")
 
             wrong_crs = self.block(0, [[1, 2, 3, 4]], crs="EPSG:4326")
             with self.assertRaisesRegex(ValueError, "does not match"):

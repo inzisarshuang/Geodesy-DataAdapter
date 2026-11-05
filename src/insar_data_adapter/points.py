@@ -130,7 +130,7 @@ class CanonicalPointWriter:
         velocity_description: str | None = None,
         velocity_nodata_policy: str | None = None,
         quality_specs: Sequence[PointQualitySpec] = (),
-        overwrite: bool = False,
+        overwrite: bool = True,
     ) -> None:
         """Validate schema choices without creating an output file."""
         self.output = Path(output_file).expanduser().resolve()

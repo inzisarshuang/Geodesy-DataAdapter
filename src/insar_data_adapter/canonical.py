@@ -106,7 +106,7 @@ class CanonicalGridWriter:
         compression: str | None = "gzip",
         compression_level: int = 4,
         include_lonlat: bool = False,
-        overwrite: bool = False,
+        overwrite: bool = True,
     ) -> None:
         """Validate dimensions and retain options without creating any file yet."""
         self.output = Path(output_file).expanduser().resolve()

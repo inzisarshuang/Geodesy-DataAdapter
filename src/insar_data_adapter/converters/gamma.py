@@ -119,7 +119,7 @@ def convert_gamma_grid(config: dict[str, Any]) -> Path:
             chunk_rows=chunk_rows,
             compression=config["compression"],
             compression_level=int(config["compression_level"]),
-            overwrite=bool(config["overwrite"]),
+            overwrite=True,
         ) as writer:
             for row_start in range(0, source.rows, chunk_rows):
                 row_stop = min(row_start + chunk_rows, source.rows)

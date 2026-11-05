@@ -152,7 +152,7 @@ def write_defsour_blocks(
     metadata: DefsourExportMetadata,
     *,
     fmt: str = "%.6f %.6f %.6f %.6f",
-    overwrite: bool = False,
+    overwrite: bool = True,
     allow_empty: bool = False,
 ) -> DefsourExportResult:
     """Validate consecutive point blocks and atomically publish Defsour text."""
@@ -199,7 +199,7 @@ def write_defsour_grid(
     fmt: str = "%.6f %.6f %.6f %.6f",
     export_invalid_points: bool = False,
     block_rows: int = 128,
-    overwrite: bool = False,
+    overwrite: bool = True,
 ) -> DefsourExportResult:
     """Filter one 2-D grid in bounded row blocks and publish Defsour text."""
     arrays = tuple(

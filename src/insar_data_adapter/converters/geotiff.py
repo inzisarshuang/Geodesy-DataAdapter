@@ -79,7 +79,7 @@ def convert_geotiff_raster(
     scale: float = 1.0,
     nan_to_zero: bool = True,
     resampling: str = "bilinear",
-    overwrite: bool = False,
+    overwrite: bool = True,
 ) -> GeoTiffConversionResult:
     """Reproject, scale, and atomically publish one float32 GeoTIFF band."""
     source = Path(input_path).expanduser().resolve()

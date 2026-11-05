@@ -32,6 +32,12 @@ Adapter 0.19 提供严格只读的 GAMMA 雷达源接口，用于参数尺寸、
 
 ## 2. Installation / 安装
 
+转换输出保持“快速产品可覆盖”的契约：成功校验后原子替换已有目标，任何失败都保留旧文件。
+`output_file` 始终优先；省略时可提供 `project_root`、`project` 和 `processing_root`，
+默认写入 `<processing_root>/CANONICAL/<output_name>`。显式导出可使用
+`AdapterProjectLayout.export(name)` 写入 `<processing_root>/EXPORT/`。Adapter 不拥有
+`INTF`、`UNW` 或 `FIGURES` 科学目录。
+
 ```bash
 python -m pip install -e .
 ```
@@ -272,7 +278,110 @@ and resampling. Inputs without embedded CRS are rejected unless
 LOS、参考、来源、比例和重采样。输入缺少内嵌 CRS 时，必须显式设置
 `source_crs_override`，否则拒绝处理。转换器不会调用 GMT。
 
-## 13. Defsour Export / Defsour 导出
+## 13. Phase and LOS Displacement Units / 相位与 LOS 形变单位
+
+`phase_to_los_displacement` and `los_displacement_to_phase` convert numeric
+arrays using an explicitly supplied radar wavelength. The convention is
+`displacement = -phase * wavelength / (4*pi)`, so positive displacement is
+toward the satellite. Displacement units may be `m`, `cm`, or `mm`; phase is
+in radians. Wavelength is never inferred from a filename or sensor label.
+
+`phase_to_los_displacement` 与 `los_displacement_to_phase` 使用调用方显式提供的
+雷达波长转换数值数组。符号约定为
+`displacement = -phase * wavelength / (4*pi)`，因此正形变表示朝向卫星。
+形变单位可选 `m`、`cm` 或 `mm`；相位单位为弧度。波长绝不从文件名或传感器名称推断。
+
+`convert_phase_binary_raster` and `convert_los_displacement_binary_raster` convert
+headerless float32 grids in bounded row blocks and atomically publish a new file.
+Callers must supply the grid shape and byte order; existing files are not
+replaced atomically after successful validation.
+
+`convert_phase_binary_raster` 与 `convert_los_displacement_binary_raster` 按受控行块
+转换无文件头 float32 栅格，并原子发布新文件。调用方必须提供网格形状和字节序；
+校验成功后会原子替换已有文件。
+
+`convert_phase_geotiff_to_los_displacement` and
+`convert_los_displacement_geotiff_to_phase` scale a GeoTIFF without changing its
+CRS or grid. They require `GeoTiffValueMetadata` with units matching the chosen
+conversion direction and preserve nodata as NaN.
+
+`convert_phase_geotiff_to_los_displacement` 与
+`convert_los_displacement_geotiff_to_phase` 对 GeoTIFF 缩放但不改变 CRS 或网格。
+它们要求 `GeoTiffValueMetadata` 的单位与转换方向一致，并将 nodata 保留为 NaN。
+
+```python
+from insar_data_adapter import (
+    phase_to_los_displacement,
+    los_displacement_to_phase,
+    convert_phase_binary_raster,
+    convert_los_displacement_binary_raster,
+)
+
+los_mm = phase_to_los_displacement(phase_radians, wavelength_m=0.05546576)
+phase_radians = los_displacement_to_phase(los_mm, wavelength_m=0.05546576)
+convert_phase_binary_raster(
+    "pair.quad.geo.unw",
+    "pair.quad.geo.mm",
+    shape=(rows, columns),
+    wavelength_m=0.05546576,
+    byte_order="big",
+)
+convert_los_displacement_binary_raster(
+    "pair.quad.geo.mm",
+    "pair.quad.geo.phase",
+    shape=(rows, columns),
+    wavelength_m=0.05546576,
+    input_unit="mm",
+    byte_order="big",
+)
+```
+
+```python
+from insar_data_adapter import (
+    GeoTiffValueMetadata,
+    convert_phase_geotiff_to_los_displacement,
+    convert_los_displacement_geotiff_to_phase,
+)
+
+metadata = GeoTiffValueMetadata(
+    input_unit="rad",
+    output_unit="mm",
+    value_quantity="cumulative_los_displacement",
+    los_positive="toward_satellite",
+    nodata_policy="NaN is nodata; zero is valid",
+    temporal_reference="source interferogram",
+    spatial_reference="source GeoTIFF grid",
+    source_provenance="pair.quad.geo.tif",
+)
+convert_phase_geotiff_to_los_displacement(
+    "pair.quad.geo.tif",
+    "pair.quad.geo.mm.tif",
+    wavelength_m=0.05546576,
+    metadata=metadata,
+)
+phase_metadata = GeoTiffValueMetadata(
+    input_unit="mm",
+    output_unit="rad",
+    value_quantity="unwrapped_phase",
+    los_positive="toward_satellite",
+    nodata_policy="NaN is nodata; zero is valid",
+    temporal_reference="source interferogram",
+    spatial_reference="source GeoTIFF grid",
+    source_provenance="pair.quad.geo.mm.tif",
+)
+convert_los_displacement_geotiff_to_phase(
+    "pair.quad.geo.mm.tif",
+    "pair.quad.geo.phase.tif",
+    wavelength_m=0.05546576,
+    metadata=phase_metadata,
+)
+```
+
+对于 GAMMA 无头 float32 栅格，`shape` 必须填写该输入文件真实的行列数；
+`byte_order` 必须与文件字节序一致。以上波长仅为调用示例，实际转换请传入该数据
+对应的雷达波长。
+
+## 14. Defsour Export / Defsour 导出
 
 `write_defsour_blocks` atomically writes validated, consecutive point blocks as
 four-column headerless Defsour text. `write_defsour_grid` applies the same writer
@@ -309,7 +418,7 @@ metadata = DefsourExportMetadata(
 result = write_defsour_blocks(blocks, "D20240101", metadata)
 ```
 
-## 14. Grid Aggregation / 网格聚合
+## 15. Grid Aggregation / 网格聚合
 
 `build_defsour_valid_mask` combines finite X/Y/elevation/deformation checks,
 optional explicit DEM/deformation sentinels, and an optional external mask.
@@ -337,7 +446,7 @@ caller responsibilities.
 均为有限数时将输出像元标为有效。倍数为一时直接返回原数组，不产生副本。倍数选择、
 坐标生成、CRS 变换和产品发布仍由调用方负责。
 
-## 15. Profile-Aware Raster Reprojection / Profile 驱动的栅格重投影
+## 16. Profile-Aware Raster Reprojection / Profile 驱动的栅格重投影
 
 `reproject_static_grid_to_profile` maps one static numeric grid and its explicit
 validity mask between caller-supplied Rasterio profiles. Numeric values use
@@ -362,7 +471,7 @@ DEM 与形变网格。两个数值网格均采用双线性重采样，有效掩�
 两个数值结果均有限时目标像元才有效。旧的对齐网格路径允许 profile 缺少地理参考，
 但源/目标形状必须一致，并返回三个独立副本。
 
-## 16. Verification / 验证
+## 17. Verification / 验证
 
 ```bash
 python -m compileall -q src tests

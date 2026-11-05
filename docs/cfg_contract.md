@@ -8,6 +8,16 @@
 - Relative paths are resolved from the cfg directory.<br>相对路径按 cfg 所在目录解析。
 - Precedence is explicit CLI values, cfg values, then code defaults.<br>优先级为显式 CLI、cfg、代码默认值。
 
+Conversion cfg files retain explicit `output_file` as the highest-priority target.
+When it is omitted, `project_root`, `project = SENSOR/CASE`, and
+`processing_root = SENSOR/CASE/METHOD` are required; optional `output_name`
+selects the filename below `<processing_root>/CANONICAL/`. Successful conversions
+atomically replace existing fast products, while failures preserve the old target.
+
+转换 CFG 中显式 `output_file` 的优先级最高。省略时必须同时提供项目根、数据项目和
+方法根，输出自动落到 `<processing_root>/CANONICAL/<output_name>`。成功时原子覆盖，
+失败时保留旧目标。
+
 ## 2. Phase 1 Inspection Keys / 第一阶段检查参数
 
 | Key | Required | Values |
@@ -44,7 +54,6 @@ Inspection and conversion use separate strict key sets, so an inspection cfg can
 | `chunk_rows` | no | positive input row-block ceiling; default `256` |
 | `compression` | no | `none`, `gzip`, or `lzf`; default `gzip` |
 | `compression_level` | no | integer `0`–`9`; default `4`, used by gzip |
-| `overwrite` | no | `true` or `false`; default `false` |
 
 The source must contain geocoded `X_FIRST`, `X_STEP`, `Y_FIRST`, `Y_STEP`, `EPSG`, `REF_DATE`, `REF_X`, and `REF_Y` attributes. `X_FIRST/Y_FIRST` are preserved as pixel-centre coordinates, matching MintPy's convention. Deformation is copied without unit scaling, nodata replacement, re-referencing, reprojection, or resampling. A mask that marks a non-finite DEM cell as valid is rejected instead of being silently changed.
 
@@ -72,7 +81,6 @@ The source must contain geocoded `X_FIRST`, `X_STEP`, `Y_FIRST`, `Y_STEP`, `EPSG
 | `chunk_rows` | no | positive input row-block ceiling; default `256` |
 | `compression` | no | `none`, `gzip`, or `lzf`; default `gzip` |
 | `compression_level` | no | integer `0`–`9`; default `4`, used by gzip |
-| `overwrite` | no | `true` or `false`; default `false` |
 
 Coordinates are preserved without scaling, reprojection, or resampling. In `preserve` mode deformation is copied unchanged; in `date` mode the requested epoch is subtracted from every epoch without unit scaling. Both paths are bounded-memory and record the temporal action in provenance. `refarea` must use `x_start:x_stop/y_start:y_stop` and remain inside the grid. If the HDF5 declares a unit or CRS, it must match cfg. General inspection reports missing LiCSBAS units and CRS as missing instead of assuming millimetres or EPSG:4326; use `require_unit = false` only when inspecting such a source before preparing an explicit conversion cfg.
 
@@ -105,7 +113,6 @@ Coordinates are preserved without scaling, reprojection, or resampling. In `pres
 | `chunk_rows` | no | positive row-block ceiling; default `256` |
 | `compression` | no | `none`, `gzip`, or `lzf`; default `gzip` |
 | `compression_level` | no | integer `0`–`9`; default `4` |
-| `overwrite` | no | `true` or `false`; default `false` |
 
 Relative paths inside `tab_file` resolve from the tab directory. The adapter rejects duplicate paths/dates, mismatched manifest lengths, wrong byte counts, false grid registration, CRS conflicts, and non-rectilinear parameter files before publishing output. Radar-coordinate data and optional reprojection remain outside Phase 3C.
 

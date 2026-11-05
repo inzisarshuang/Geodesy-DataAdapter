@@ -21,9 +21,12 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
+from .project_layout import AdapterProjectLayout
+
 
 _INSPECT_KEYS = {"input_file", "input_type", "require_unit"}
 _INPUT_TYPES = {"auto", "mintpy", "licsbas", "standard"}
+_LAYOUT_KEYS = {"project_root", "project", "processing_root", "output_name"}
 
 _MINTPY_CONVERSION_KEYS = {
     "timeseries_file",
@@ -39,7 +42,7 @@ _MINTPY_CONVERSION_KEYS = {
     "compression",
     "compression_level",
     "overwrite",
-}
+} | _LAYOUT_KEYS
 
 _LICSBAS_CONVERSION_KEYS = {
     "input_file",
@@ -61,7 +64,7 @@ _LICSBAS_CONVERSION_KEYS = {
     "compression",
     "compression_level",
     "overwrite",
-}
+} | _LAYOUT_KEYS
 
 _GAMMA_CONVERSION_KEYS = {
     "tab_file",
@@ -92,7 +95,7 @@ _GAMMA_CONVERSION_KEYS = {
     "compression",
     "compression_level",
     "overwrite",
-}
+} | _LAYOUT_KEYS
 
 
 def _parse_bool(value: str, key: str) -> bool:
@@ -166,6 +169,28 @@ def _parse_optional_number(values: dict[str, str], key: str) -> float | None:
     return parsed
 
 
+def _conversion_output(
+    values: dict[str, str], config_path: Path, default_name: str
+) -> Path:
+    """Resolve an explicit target or derive one below method-root CANONICAL."""
+
+    if "output_file" in values:
+        return _resolve_path(values["output_file"], config_path)
+    required = ("project_root", "project", "processing_root")
+    missing = [key for key in required if key not in values]
+    if missing:
+        raise ValueError(
+            "output_file or complete method-root context is required; missing: "
+            + ", ".join(missing)
+        )
+    layout = AdapterProjectLayout.bind(
+        _resolve_path(values["project_root"], config_path),
+        values["project"],
+        values["processing_root"],
+    )
+    return layout.canonical(values.get("output_name", default_name))
+
+
 def load_inspect_config(config_file: str | Path) -> dict[str, object]:
     """Load a strict Phase 1 inspection configuration."""
     path = Path(config_file).expanduser().resolve()
@@ -190,7 +215,6 @@ def load_mintpy_conversion_config(config_file: str | Path) -> dict[str, object]:
         "timeseries_file",
         "geometry_file",
         "mask_file",
-        "output_file",
         "los_positive",
         "nodata_policy",
         "height_unit",
@@ -205,7 +229,7 @@ def load_mintpy_conversion_config(config_file: str | Path) -> dict[str, object]:
         "timeseries_file": _resolve_path(values["timeseries_file"], path),
         "geometry_file": _resolve_path(values["geometry_file"], path),
         "mask_file": _resolve_path(values["mask_file"], path),
-        "output_file": _resolve_path(values["output_file"], path),
+        "output_file": _conversion_output(values, path, "mintpy.h5"),
         "height_dataset": values.get("height_dataset", "height"),
         "mask_dataset": values.get("mask_dataset", "mask"),
         "los_positive": values["los_positive"],
@@ -216,7 +240,6 @@ def load_mintpy_conversion_config(config_file: str | Path) -> dict[str, object]:
         "compression_level": _parse_integer(
             values.get("compression_level", "4"), "compression_level", 0, 9
         ),
-        "overwrite": _parse_bool(values.get("overwrite", "false"), "overwrite"),
     }
 
 
@@ -226,7 +249,6 @@ def load_licsbas_conversion_config(config_file: str | Path) -> dict[str, object]
     values = _read_strict_config(path, _LICSBAS_CONVERSION_KEYS)
     required = {
         "input_file",
-        "output_file",
         "deformation_unit",
         "height_unit",
         "crs",
@@ -257,7 +279,7 @@ def load_licsbas_conversion_config(config_file: str | Path) -> dict[str, object]
         raise ValueError("compression must be none, gzip, or lzf")
     return {
         "input_file": _resolve_path(values["input_file"], path),
-        "output_file": _resolve_path(values["output_file"], path),
+        "output_file": _conversion_output(values, path, "licsbas.h5"),
         "deformation_dataset": values.get("deformation_dataset", "cum"),
         "date_dataset": values.get("date_dataset", "imdates"),
         "height_dataset": values.get("height_dataset", "hgt"),
@@ -276,7 +298,6 @@ def load_licsbas_conversion_config(config_file: str | Path) -> dict[str, object]
         "compression_level": _parse_integer(
             values.get("compression_level", "4"), "compression_level", 0, 9
         ),
-        "overwrite": _parse_bool(values.get("overwrite", "false"), "overwrite"),
     }
 
 
@@ -290,7 +311,6 @@ def load_gamma_conversion_config(config_file: str | Path) -> dict[str, object]:
         "parameter_file",
         "height_file",
         "mask_file",
-        "output_file",
         "deformation_dtype",
         "deformation_byte_order",
         "height_dtype",
@@ -332,7 +352,7 @@ def load_gamma_conversion_config(config_file: str | Path) -> dict[str, object]:
         "parameter_file": _resolve_path(values["parameter_file"], path),
         "height_file": _resolve_path(values["height_file"], path),
         "mask_file": _resolve_path(values["mask_file"], path),
-        "output_file": _resolve_path(values["output_file"], path),
+        "output_file": _conversion_output(values, path, "gamma.h5"),
         "deformation_dtype": values["deformation_dtype"],
         "deformation_byte_order": values["deformation_byte_order"].lower(),
         "height_dtype": values["height_dtype"],
@@ -356,5 +376,4 @@ def load_gamma_conversion_config(config_file: str | Path) -> dict[str, object]:
         "compression_level": _parse_integer(
             values.get("compression_level", "4"), "compression_level", 0, 9
         ),
-        "overwrite": _parse_bool(values.get("overwrite", "false"), "overwrite"),
     }

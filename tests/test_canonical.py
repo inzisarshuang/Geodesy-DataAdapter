@@ -35,7 +35,7 @@ class CanonicalGridIOTests(unittest.TestCase):
         self.x = np.arange(4, dtype=float) + 10.0
         self.y = np.arange(3, dtype=float)[::-1] + 20.0
 
-    def _complete_product(self, output: Path, overwrite: bool = False) -> None:
+    def _complete_product(self, output: Path, overwrite: bool = True) -> None:
         """Write one small product in multiple row blocks."""
         with CanonicalGridWriter(
             output,
@@ -98,21 +98,12 @@ class CanonicalGridIOTests(unittest.TestCase):
         self.assertEqual(output.read_bytes(), b"original")
         self.assertEqual(list(self.root.glob(".existing.h5.*.tmp")), [])
 
-    def test_rejects_existing_output_and_overlapping_rows(self) -> None:
-        """Require explicit overwrite and reject accidental duplicate block writes."""
+    def test_replaces_existing_output_and_rejects_overlapping_rows(self) -> None:
+        """Replace complete fast products and reject duplicate block writes."""
         output = self.root / "product.h5"
+        output.write_bytes(b"stale")
         self._complete_product(output)
-        with self.assertRaises(FileExistsError):
-            with CanonicalGridWriter(
-                output,
-                self.dates,
-                rows=3,
-                columns=4,
-                x=self.x,
-                y=self.y,
-                metadata=self.metadata,
-            ):
-                pass
+        self.assertNotEqual(output.read_bytes(), b"stale")
         replacement = self.root / "replacement.h5"
         with self.assertRaisesRegex(ValueError, "overlap"):
             with CanonicalGridWriter(
