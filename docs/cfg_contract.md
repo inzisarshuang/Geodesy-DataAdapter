@@ -130,3 +130,31 @@ and only then add a strict source-specific cfg and conversion command.
 PSI_WWQ/PSI_ZDN 的来源契约，所以本阶段不增加 cfg 参数。第四阶段 B 将先检查
 这些来源产品，明确记录单位、正负号、参考、nodata、点标识、坐标及质量字段的
 每一项映射，再增加严格的来源 cfg 与转换命令。
+
+## 7. Direct Defsour Workflow Keys / 直接 Defsour 工作流参数
+
+All three source workflows require an explicit `output_dir` (or complete
+method-root context), `dates`, source/output CRS, deformation scale and matching
+output unit, deformation quantity, height unit, LOS convention, nodata policy,
+temporal/spatial reference, provenance, one downsample mode, aggregation,
+`chunk_rows`, `write_tif`, and `overwrite`.
+
+三种来源均必须显式填写输出目录（或完整 method-root 上下文）、时期、
+源/目标 CRS、倍率与对应输出单位、物理量、高程单位、LOS 符号、nodata、
+时空参考、来源、降采样方式、聚合、行块大小和覆盖策略。
+
+- GAMMA additionally requires tab/date/parameter/DEM/mask paths and explicit
+  binary dtype/byte order. Radar grids add paired longitude/latitude rasters
+  with their own dtype/order. `mode = aligned` requires an alignment template.
+- MintPy requires explicit time-series, geometry, and mask files plus dataset
+  names. Native epoch/velocity/DEM GeoTIFFs are opt-in; `native_only = true`
+  requires native epoch GeoTIFF output.
+- LiCSBAS requires the input HDF5, dataset names including `refarea_dataset`,
+  and `source_unit`. A declared source unit/CRS must agree with CFG.
+
+Every relative path resolves from its CFG. The output directory is staged as a
+sibling and replaced only after every declared product, README, and manifest
+validates. See `config/data2defsour/` for complete bilingual templates.
+
+所有相对路径以 CFG 所在目录为基准。输出先在同级临时目录完整生成和校验，
+然后才替换旧目录。完整中英文模板位于 `config/data2defsour/`。

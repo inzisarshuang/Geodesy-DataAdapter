@@ -26,6 +26,14 @@ from .config import (
 )
 from .converters import convert_gamma_grid, convert_licsbas_grid, convert_mintpy_grid
 from .hdf5 import inspect_hdf5
+from .workflows.defsour.config import (
+    load_gamma_defsour_config,
+    load_licsbas_defsour_config,
+    load_mintpy_defsour_config,
+)
+from .workflows.defsour.gamma import export_gamma_defsour
+from .workflows.defsour.licsbas import export_licsbas_defsour
+from .workflows.defsour.mintpy import export_mintpy_defsour
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -41,12 +49,58 @@ def build_parser() -> argparse.ArgumentParser:
     convert_licsbas.add_argument("--config", required=True)
     convert_gamma = subparsers.add_parser("convert-gamma")
     convert_gamma.add_argument("--config", required=True)
+    for command in (
+        "export-gamma-defsour",
+        "export-mintpy-defsour",
+        "export-licsbas-defsour",
+    ):
+        export = subparsers.add_parser(command)
+        export.add_argument("--config", required=True)
     return parser
 
 
-def main() -> None:
+def _print_defsour_summary(output_dir, result) -> None:
+    dates = ", ".join(epoch.date for epoch in result.epochs)
+    counts = ", ".join(str(epoch.point_count) for epoch in result.epochs)
+    geotiffs = sum(epoch.geotiff_path is not None for epoch in result.epochs)
+    geotiffs += sum(
+        path.suffix.lower() in {".tif", ".tiff"}
+        for path in result.additional_products
+    )
+    templates = sum(
+        path.name.endswith("template.npz") for path in result.additional_products
+    )
+    print(f"OUTPUT: {output_dir}")
+    print(f"DATES: {dates}")
+    print(f"POINT_COUNTS: {counts}")
+    print(f"GEOTIFFS: {geotiffs}")
+    print(f"TEMPLATES: {templates}")
+    print(f"MANIFEST: {output_dir / 'defsour_manifest.json'}")
+
+
+def main(argv=None) -> None:
     """Run one configured inspection or atomic source conversion."""
-    arguments = build_parser().parse_args()
+    arguments = build_parser().parse_args(argv)
+    defsour_commands = {
+        "export-gamma-defsour": (
+            load_gamma_defsour_config,
+            export_gamma_defsour,
+        ),
+        "export-mintpy-defsour": (
+            load_mintpy_defsour_config,
+            export_mintpy_defsour,
+        ),
+        "export-licsbas-defsour": (
+            load_licsbas_defsour_config,
+            export_licsbas_defsour,
+        ),
+    }
+    if arguments.command in defsour_commands:
+        loader, workflow = defsour_commands[arguments.command]
+        config = loader(arguments.config)
+        result = workflow(config)
+        _print_defsour_summary(config.output_dir, result)
+        return
     if arguments.command == "convert-mintpy":
         output = convert_mintpy_grid(load_mintpy_conversion_config(arguments.config))
         print(f"WROTE: {output}")

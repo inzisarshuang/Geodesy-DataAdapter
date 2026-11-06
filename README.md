@@ -14,7 +14,9 @@ This repository does not perform InSAR preprocessing, interferometric analysis, 
 
 ```text
 Geodesy-DataAdapter/
-├── config_examples/          # Example conversion configurations / 转换配置示例
+├── config/                   # Canonical and data2defsour CFGs / 标准化与 Defsour 配置
+│   ├── canonical/
+│   └── data2defsour/
 ├── docs/                     # Contracts, architecture, and detailed workflows / 契约、架构与详细流程
 ├── src/insar_data_adapter/   # Python package / Python 包
 ├── tests/                    # Automated tests / 自动化测试
@@ -61,15 +63,23 @@ Core dependencies are declared in `pyproject.toml`. Optional readers may require
 Inspect a source product before conversion:
 
 ```bash
-insar-adapter inspect --config config_examples/inspect.cfg
-insar-adapter validate --config config_examples/inspect.cfg
+insar-adapter inspect --config config/canonical/inspect_h5.cfg
+insar-adapter validate --config config/canonical/inspect_h5.cfg
 ```
 
 Convert a GAMMA product with an explicit configuration:
 
 ```bash
 insar-adapter convert-gamma \
-  --config config_examples/gamma_to_canonical.cfg
+  --config config/canonical/gamma_to_canonical_h5.cfg
+```
+
+Export a source product directly as one transactional Defsour snapshot:
+
+```bash
+insar-adapter export-gamma-defsour --config config/data2defsour/gamma_to_defsour.cfg
+insar-adapter export-mintpy-defsour --config config/data2defsour/mintpy_to_defsour.cfg
+insar-adapter export-licsbas-defsour --config config/data2defsour/licsbas_to_defsour.cfg
 ```
 
 Use absolute paths in project CFG files when products are shared across repositories. Keep reusable defaults in the repository examples and project-specific paths in the project-level `config/` tree.
@@ -93,6 +103,13 @@ For a method-centric project, place normalized data under the selected method ro
 Conversion outputs are intentionally overwriteable: adapters are fast, deterministic transformation steps. Configure the target path explicitly when an existing product must be preserved.
 
 转换结果允许直接覆盖，因为适配过程是快速、确定的数据变换步骤。如需保留已有产品，请在 CFG 中显式指定另一个目标路径。
+
+Defsour workflows publish `epochs/`, optional `geotiff/` or `native/`,
+`README_DEFSOUR.txt`, and `defsour_manifest.json` as one directory transaction.
+A failed epoch never leaves a mixed old/new export.
+
+Defsour 工作流将各时期、可选 GeoTIFF/原分辨率产品、说明和 manifest
+作为一个目录事务发布；任一时期失败都不会暴露新旧混合结果。
 
 ## 7. Verification And Development / 验证与开发
 

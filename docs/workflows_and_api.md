@@ -16,17 +16,18 @@ This document is the detailed workflow and API reference for `Geodesy-DataAdapte
 - Build Defsour grid validity from finite values, explicit sentinels, and an optional external mask without treating zero as nodata.<br>从有限值、显式哨兵值和可选外部掩膜构建 Defsour 网格有效性，不将零视为 nodata。
 - Parse named headered point-value snapshots without loading complete tables.<br>按具名表头解析点值快照，且不加载完整数据表。
 - Reproject and scale single-band GeoTIFFs with explicit metadata, nodata, resampling, and atomic output.<br>使用显式元数据、nodata、重采样和原子输出重投影及缩放单波段 GeoTIFF。
+- Export GAMMA, MintPy, and LiCSBAS grids directly to transactional Defsour snapshots without materializing a time cube.<br>不实例化整个时间立方体，直接将 GAMMA、MintPy 和 LiCSBAS 网格导出为事务式 Defsour 快照。
 
-Complete radar-coordinate GAMMA conversion, source-specific PS/DS ingestion, GRD export, canonical-to-GeoTIFF export, and direct PyGMT rendering are intentionally deferred to later phases. Defsour publication and grid aggregation expose source-neutral Python APIs; source-specific workflow orchestration remains upstream.
+Source-specific PS/DS ingestion, GRD export, canonical-to-GeoTIFF export, and direct PyGMT rendering remain deferred. GAMMA Defsour export now accepts both regular geocoded grids and explicit radar-grid longitude/latitude rasters.
 
-完整雷达坐标 GAMMA 转换、特定来源的 PS/DS 接入、GRD 导出、标准产品到 GeoTIFF 导出及直接 PyGMT 渲染明确留到后续阶段。Defsour 发布与网格聚合提供来源中立的 Python API；特定来源的工作流编排仍保留在上游。
+特定来源的 PS/DS 接入、GRD 导出、标准产品到 GeoTIFF 导出及直接 PyGMT 渲染仍留到后续阶段。GAMMA Defsour 导出已同时支持规则地理编码网格和显式经纬度雷达网格。
 
-Adapter 0.19 exposes strict read-only GAMMA radar primitives for parameter
+Adapter 0.20 exposes strict read-only GAMMA radar primitives for parameter
 shapes, explicit real/complex binary rasters, and geographic-lookup sampling.
 These APIs adapt source representation only; they do not perform interferometric
 analysis or define a complete radar-coordinate converter.
 
-Adapter 0.19 提供严格只读的 GAMMA 雷达源接口，用于参数尺寸、显式实数/复数
+Adapter 0.20 提供严格只读的 GAMMA 雷达源接口，用于参数尺寸、显式实数/复数
 二进制栅格及地理 lookup 抽样。这些接口只适配来源表示，不执行干涉分析，也不
 构成完整的雷达坐标转换器。
 
@@ -45,8 +46,8 @@ python -m pip install -e .
 ## 3. Inspection / 检查
 
 ```bash
-insar-adapter inspect --config config_examples/inspect.cfg
-insar-adapter validate --config config_examples/inspect.cfg
+insar-adapter inspect --config config/canonical/inspect_h5.cfg
+insar-adapter validate --config config/canonical/inspect_h5.cfg
 ```
 
 Paths in cfg files are resolved relative to the cfg location. JSON output is suitable for logs and future workflow manifests.
@@ -66,7 +67,7 @@ The converter reads `/timeseries` by epoch and row block. It copies deformation 
 转换器按时期和行块读取 `/timeseries`，原样保留形变值与单位。DEM、静态有效掩膜、LOS 正负号、nodata 规则及高程单位都必须显式提供；缺失的几何信息绝不会用零 DEM 代替。
 
 ```bash
-insar-adapter convert-mintpy --config config_examples/mintpy_to_canonical.cfg
+insar-adapter convert-mintpy --config config/canonical/mintpy_to_canonical_h5.cfg
 ```
 
 ## 6. LiCSBAS Grid Conversion / LiCSBAS 规则栅格转换
@@ -76,7 +77,7 @@ LiCSBAS cumulative deformation, DEM, mask, pixel-centre coordinates, and spatial
 LiCSBAS 累积形变、DEM、mask、像元中心坐标和空间参考区从同一 HDF5 中按行块读取。由于许多 LiCSBAS 文件没有用 HDF5 属性声明科学约定，cfg 必须填写形变/高程单位、CRS、LOS 正号、nodata 规则、时间参考模式和像元注册方式。时间值既可原样保留并显式说明来源参考，也可通过减去 cfg 指定日期重新参考。
 
 ```bash
-insar-adapter convert-licsbas --config config_examples/licsbas_to_canonical.cfg
+insar-adapter convert-licsbas --config config/canonical/licsbas_to_canonical_h5.cfg
 ```
 
 ## 7. GAMMA Geocoded Grid Conversion / GAMMA 地理编码规则栅格转换
@@ -86,10 +87,31 @@ The first GAMMA adapter accepts a `tab` of headerless deformation files, a separ
 首版 GAMMA adapter 接受无文件头形变文件 `tab`、逐行日期清单、真实 DEM、显式 mask，以及包含规则经纬网格的 `.par`。每种 dtype 与字节序均显式填写；转换前检查所有二进制文件大小，数据通过 `memmap` 行切片读取。雷达坐标或曲线网格输入必须先完成地理编码。
 
 ```bash
-insar-adapter convert-gamma --config config_examples/gamma_to_canonical.cfg
+insar-adapter convert-gamma --config config/canonical/gamma_to_canonical_h5.cfg
 ```
 
-## 8. Canonical Grid API / 标准栅格 API
+## 8. Direct Source-to-Defsour / 来源直转 Defsour
+
+Direct Defsour workflows use the source-specific CFGs under
+`config/data2defsour/`:
+
+```bash
+insar-adapter export-gamma-defsour --config config/data2defsour/gamma_to_defsour.cfg
+insar-adapter export-mintpy-defsour --config config/data2defsour/mintpy_to_defsour.cfg
+insar-adapter export-licsbas-defsour --config config/data2defsour/licsbas_to_defsour.cfg
+```
+
+All three commands select dates, apply the explicit temporal reference and
+scale, compose finite values with the configured mask, downsample/reproject,
+and publish `defsour_manifest.json` last. GAMMA also supports reusable aligned
+templates; MintPy can additionally publish native epoch, velocity, and DEM
+GeoTIFFs. No command searches for sibling inputs implicitly.
+
+三个命令均按 CFG 选时期、时间参考与倍率，组合有限值和显式 mask，
+再执行降采样/重投影，最后写入 `defsour_manifest.json`。GAMMA 可复用对齐
+模板；MintPy 还可导出原分辨率时期、速度和 DEM GeoTIFF。命令不会自动搜索同目录输入。
+
+## 9. Canonical Grid API / 标准栅格 API
 
 Writers accept complete epochs for moderate grids or full-column row blocks for large grids. Required geometry follows the same row-block pattern. The destination appears only after every epoch row and geometry row has been written and validated.
 
@@ -133,7 +155,7 @@ Reader 通过 `reader.summary` 提供日期与维度，通过 `reader.metadata` 
 `grid_registration` 提供网格注册方式，并通过 `read_epoch` 的受控行切片提供数值。
 绘图消费端可完全使用这些公共接口，无需访问底层 HDF5 handle。
 
-## 9. Canonical PS/DS Point API / 标准 PS/DS 点 API
+## 10. Canonical PS/DS Point API / 标准 PS/DS 点 API
 
 `CanonicalPointWriter` writes static point fields in sequential point blocks and
 each deformation epoch independently in sequential point blocks. Optional
@@ -201,7 +223,7 @@ to Phase 4B after read-only source inspection.
 
 完整的 PSI_WWQ/PSI_ZDN 来源映射与 cfg 将在只读检查来源后于第四阶段 B 实现。
 
-## 10. Defsour Point Source / Defsour 点表来源
+## 11. Defsour Point Source / Defsour 点表来源
 
 `DefsourPointSource` reads a headerless point snapshot without loading the
 complete table. The default columns are X, Y, elevation, and deformation. All
@@ -233,7 +255,7 @@ with DefsourPointSource("D20160512", metadata) as source:
         consume(block.x, block.y, block.height, block.deformation)
 ```
 
-## 11. Headered Point-Value Source / 带表头点值来源
+## 12. Headered Point-Value Source / 带表头点值来源
 
 `HeaderedPointTableSource` reads named X, Y, and scientific value roles in
 bounded blocks. The default role names are `lon` and `lat`; callers should name
@@ -267,7 +289,7 @@ with HeaderedPointTableSource(
         consume(block.x, block.y, block.value)
 ```
 
-## 12. GeoTIFF Raster Adaptation / GeoTIFF 栅格适配
+## 13. GeoTIFF Raster Adaptation / GeoTIFF 栅格适配
 
 `convert_geotiff_raster` produces an atomic float32 GeoTIFF while preserving an
 explicit record of units, quantity, LOS sign, references, provenance, scale,
@@ -278,7 +300,7 @@ and resampling. Inputs without embedded CRS are rejected unless
 LOS、参考、来源、比例和重采样。输入缺少内嵌 CRS 时，必须显式设置
 `source_crs_override`，否则拒绝处理。转换器不会调用 GMT。
 
-## 13. Phase and LOS Displacement Units / 相位与 LOS 形变单位
+## 14. Phase and LOS Displacement Units / 相位与 LOS 形变单位
 
 `phase_to_los_displacement` and `los_displacement_to_phase` convert numeric
 arrays using an explicitly supplied radar wavelength. The convention is
@@ -381,7 +403,7 @@ convert_los_displacement_geotiff_to_phase(
 `byte_order` 必须与文件字节序一致。以上波长仅为调用示例，实际转换请传入该数据
 对应的雷达波长。
 
-## 14. Defsour Export / Defsour 导出
+## 15. Defsour Export / Defsour 导出
 
 `write_defsour_blocks` atomically writes validated, consecutive point blocks as
 four-column headerless Defsour text. `write_defsour_grid` applies the same writer
@@ -418,7 +440,7 @@ metadata = DefsourExportMetadata(
 result = write_defsour_blocks(blocks, "D20240101", metadata)
 ```
 
-## 15. Grid Aggregation / 网格聚合
+## 16. Grid Aggregation / 网格聚合
 
 `build_defsour_valid_mask` combines finite X/Y/elevation/deformation checks,
 optional explicit DEM/deformation sentinels, and an optional external mask.
@@ -446,7 +468,7 @@ caller responsibilities.
 均为有限数时将输出像元标为有效。倍数为一时直接返回原数组，不产生副本。倍数选择、
 坐标生成、CRS 变换和产品发布仍由调用方负责。
 
-## 16. Profile-Aware Raster Reprojection / Profile 驱动的栅格重投影
+## 17. Profile-Aware Raster Reprojection / Profile 驱动的栅格重投影
 
 `reproject_static_grid_to_profile` maps one static numeric grid and its explicit
 validity mask between caller-supplied Rasterio profiles. Numeric values use
@@ -471,7 +493,7 @@ DEM 与形变网格。两个数值网格均采用双线性重采样，有效掩�
 两个数值结果均有限时目标像元才有效。旧的对齐网格路径允许 profile 缺少地理参考，
 但源/目标形状必须一致，并返回三个独立副本。
 
-## 17. Verification / 验证
+## 18. Verification / 验证
 
 ```bash
 python -m compileall -q src tests
