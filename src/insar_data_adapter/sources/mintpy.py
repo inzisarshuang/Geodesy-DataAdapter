@@ -13,6 +13,7 @@ mintpy
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -106,7 +107,17 @@ class MintPyGridSource:
         dates = handle[self.date_dataset]
         if dates.ndim != 1 or len(dates) != displacement.shape[0]:
             raise ValueError("MintPy date and time dimensions are inconsistent")
-        self.dates = tuple(_text(value) for value in dates[...])
+        parsed_dates = tuple(_text(value).strip() for value in dates[...])
+        for date in parsed_dates:
+            try:
+                if len(date) != 8 or not date.isdigit():
+                    raise ValueError
+                datetime.strptime(date, "%Y%m%d")
+            except ValueError as error:
+                raise ValueError(f"invalid MintPy YYYYMMDD date: {date!r}") from error
+        if len(set(parsed_dates)) != len(parsed_dates):
+            raise ValueError("MintPy date dataset contains duplicate dates")
+        self.dates = parsed_dates
 
         attrs = handle.attrs
         required_attrs = {

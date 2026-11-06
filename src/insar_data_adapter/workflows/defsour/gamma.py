@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 from affine import Affine
-from pyproj import Transformer
+from pyproj import CRS, Transformer
 from rasterio.transform import array_bounds
 from rasterio.warp import calculate_default_transform
 
@@ -37,7 +37,7 @@ from .grid import (
     select_downsample_factor,
 )
 from .models import DefsourEpochResult, DefsourSnapshotMetadata
-from .publication import publish_defsour_snapshot
+from .publication import publish_defsour_snapshot, validate_output_separation
 
 
 def _read_epoch(source: GammaGeoGridSource, index: int, chunk_rows: int) -> np.ndarray:
@@ -281,18 +281,39 @@ def export_gamma_defsour(config: GammaDefsourConfig) -> DefsourSnapshotMetadata:
         mask_dtype=config.mask_dtype,
         mask_byte_order=config.mask_byte_order,
     ) as source:
+        owned_paths = (
+            (config.output_dir / "alignment_template.npz",)
+            if config.alignment_template == config.output_dir / "alignment_template.npz"
+            else ()
+        )
+        validate_output_separation(
+            config.output_dir,
+            (
+                config.config_path,
+                config.tab_file,
+                config.dates_file,
+                config.parameter_file,
+                config.height_file,
+                config.mask_file,
+                config.longitude_file,
+                config.latitude_file,
+                config.source_manifest,
+                config.alignment_template,
+                *source.deformation_paths,
+            ),
+            owned_output_paths=owned_paths,
+        )
         indices = _selected(source, config)
         source_profile = _source_profile(source, config)
         coordinates = _read_coordinates(source, config)
+        if coordinates is not None and config.mode == "native" and config.write_tif:
+            raise ValueError(
+                "irregular GAMMA coordinates require mode=aligned before writing GeoTIFF"
+            )
         factor_profile = (
             source_profile
             if source_profile is not None
             else _irregular_profile(*coordinates, config)  # type: ignore[arg-type]
-        )
-        regular_output_profile = (
-            _output_profile(source_profile, config.output_crs)
-            if source_profile is not None
-            else None
         )
         height = _read_static(source, "read_height_rows", config.chunk_rows)
         mask = _read_static(source, "read_mask_rows", config.chunk_rows)
@@ -319,6 +340,11 @@ def export_gamma_defsour(config: GammaDefsourConfig) -> DefsourSnapshotMetadata:
             target_points=config.target_points,
             target_pixel_size=config.target_pixel_size,
         )
+        regular_output_profile = (
+            _output_profile(source_profile.downsampled(factor), config.output_crs)
+            if source_profile is not None
+            else None
+        )
         template: DefsourAlignmentTemplate | None = None
         template_exists = False
         if config.mode == "aligned":
@@ -328,6 +354,14 @@ def export_gamma_defsour(config: GammaDefsourConfig) -> DefsourSnapshotMetadata:
                 template = load_alignment_template(config.alignment_template)
                 if template.factor != factor:
                     raise ValueError("alignment template factor conflicts with CFG")
+                if CRS.from_user_input(template.profile.crs) != CRS.from_user_input(
+                    config.output_crs
+                ):
+                    raise ValueError("alignment template CRS conflicts with output_crs")
+                if template.profile.registration != config.grid_registration:
+                    raise ValueError(
+                        "alignment template registration conflicts with CFG"
+                    )
             else:
                 expected_template = config.output_dir / "alignment_template.npz"
                 if config.alignment_template != expected_template:
@@ -415,17 +449,24 @@ def export_gamma_defsour(config: GammaDefsourConfig) -> DefsourSnapshotMetadata:
                     template = DefsourAlignmentTemplate(
                         prepared.profile, factor, prepared.x, prepared.y
                     )
+                export_height = prepared.height
+                export_deformation = prepared.deformation
+                export_mask = prepared.valid
+                if config.export_invalid_points:
+                    export_height = np.asarray(prepared.height, dtype=np.float64).copy()
+                    export_deformation = np.asarray(
+                        prepared.deformation, dtype=np.float64
+                    ).copy()
+                    export_height[~prepared.valid] = np.nan
+                    export_deformation[~prepared.valid] = np.nan
+                    export_mask = np.ones_like(prepared.valid)
                 relative = Path("epochs") / f"{config.prefix}{source.dates[index]}{config.extension}"
                 exported = write_defsour_grid(
                     prepared.x,
                     prepared.y,
-                    prepared.height,
-                    prepared.deformation,
-                    (
-                        np.ones_like(prepared.valid)
-                        if config.export_invalid_points
-                        else prepared.valid
-                    ),
+                    export_height,
+                    export_deformation,
+                    export_mask,
                     staging / relative,
                     metadata,
                     fmt=config.fmt,

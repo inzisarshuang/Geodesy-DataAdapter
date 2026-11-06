@@ -61,6 +61,13 @@ class DefsourAlignmentTests(unittest.TestCase):
 
     def test_rejects_nonfinite_shape_missing_and_pickle_object_arrays(self) -> None:
         template = self.template()
+        with self.assertRaisesRegex(ValueError, "coordinate.*profile"):
+            DefsourAlignmentTemplate(
+                template.profile,
+                template.factor,
+                template.x[:, ::-1],
+                template.y[:, ::-1],
+            )
         with self.assertRaisesRegex(ValueError, "shape"):
             DefsourAlignmentTemplate(template.profile, 2, template.x[:, :2], template.y)
         bad_x = template.x.copy()

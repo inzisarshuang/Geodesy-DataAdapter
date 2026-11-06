@@ -17,7 +17,7 @@ from insar_data_adapter.sources.licsbas import LiCSBASGridSource
 from .config import LiCSBASDefsourConfig
 from .grid import GridProfile, prepare_defsour_epoch, select_downsample_factor
 from .models import DefsourEpochResult, DefsourSnapshotMetadata
-from .publication import publish_defsour_snapshot
+from .publication import publish_defsour_snapshot, validate_output_separation
 
 
 def _read_epoch(source: LiCSBASGridSource, index: int, chunk_rows: int) -> np.ndarray:
@@ -114,11 +114,14 @@ def export_licsbas_defsour(config: LiCSBASDefsourConfig) -> DefsourSnapshotMetad
         mask_dataset=config.mask_dataset,
         refarea_dataset=config.refarea_dataset,
     ) as source:
+        validate_output_separation(
+            config.output_dir,
+            (config.config_path, config.input_file),
+        )
         if source.declared_unit is not None and _normalized_unit(source.declared_unit) != _normalized_unit(config.source_unit):
             raise ValueError("configured source_unit conflicts with LiCSBAS declared unit")
         indices = _selected(source, config)
         source_profile = _profile(source, config.source_crs)
-        destination_profile = _output_profile(source_profile, config.output_crs)
         height = _read_static(source, "read_height_rows", config.chunk_rows)
         mask = _read_static(source, "read_mask_rows", config.chunk_rows)
         factor = select_downsample_factor(
@@ -128,6 +131,9 @@ def export_licsbas_defsour(config: LiCSBASDefsourConfig) -> DefsourSnapshotMetad
             factor=config.factor,
             target_points=config.target_points,
             target_pixel_size=config.target_pixel_size,
+        )
+        destination_profile = _output_profile(
+            source_profile.downsampled(factor), config.output_crs
         )
         if config.temporal_reference == "preserve":
             reference_index = None

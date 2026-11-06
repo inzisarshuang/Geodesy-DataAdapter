@@ -65,7 +65,19 @@ class MintPyDefsourWorkflowTests(unittest.TestCase):
         with h5py.File(root / "mask.h5", "w") as handle:
             handle.create_dataset("custom_mask", data=mask)
         with h5py.File(root / "velocity.h5", "w") as handle:
-            handle.create_dataset("custom_velocity", data=np.ones((3, 4), dtype=np.float32))
+            velocity = handle.create_dataset(
+                "custom_velocity", data=np.ones((3, 4), dtype=np.float32)
+            )
+            velocity.attrs["UNIT"] = "m/year"
+            handle.attrs.update(
+                {
+                    "X_FIRST": 100.0,
+                    "X_STEP": 0.01,
+                    "Y_FIRST": 35.0,
+                    "Y_STEP": -0.01,
+                    "EPSG": 4326,
+                }
+            )
 
         cfg = root / f"{output}.cfg"
         cfg.write_text(
@@ -100,6 +112,7 @@ date_dataset = custom_date
 height_dataset = custom_height
 mask_dataset = custom_mask
 velocity_dataset = custom_velocity
+velocity_source_unit = m/year
 write_native_tif = true
 write_velocity_tif = true
 write_dem_tif = true
@@ -144,6 +157,9 @@ native_only = {str(native_only).lower()}
             self.assertTrue(all(epoch.defsour_path is None for epoch in result.epochs))
             self.assertFalse((root / "native/epochs").exists())
             self.assertTrue((root / "native/native/mintpy_20240113.tif").is_file())
+            manifest = json.loads((root / "native/defsour_manifest.json").read_text())
+            self.assertEqual(manifest["metadata"]["crs"], "EPSG:4326")
+            self.assertEqual(manifest["transformations"]["native_crs"], "EPSG:4326")
 
     def test_reads_epochs_in_configured_row_blocks(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -160,6 +176,18 @@ native_only = {str(native_only).lower()}
                 export_mintpy_defsour(config)
             self.assertTrue(spans)
             self.assertLessEqual(max(spans), config.chunk_rows)
+
+    def test_output_projection_preserves_downsampled_shape(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cfg = self.fixture(root)
+            cfg.write_text(cfg.read_text().replace("factor = 1", "factor = 2"))
+
+            result = export_mintpy_defsour(load_mintpy_defsour_config(cfg))
+
+            self.assertEqual([epoch.point_count for epoch in result.epochs], [2, 2])
+            with rasterio.open(root / "export/geotiff/mintpy_20240101.tif") as dataset:
+                self.assertEqual(dataset.shape, (1, 2))
 
     def test_late_epoch_failure_preserves_previous_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -198,6 +226,35 @@ native_only = {str(native_only).lower()}
             with self.assertRaisesRegex(ValueError, "EPSG"):
                 export_mintpy_defsour(load_mintpy_defsour_config(cfg))
             self.assertFalse((root / "conflict").exists())
+
+    def test_duplicate_source_dates_are_rejected_before_output(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cfg = self.fixture(root)
+            with h5py.File(root / "timeseries.h5", "r+") as handle:
+                handle["custom_date"][...] = np.array([b"20240101", b"20240101"])
+
+            with self.assertRaisesRegex(ValueError, "duplicate"):
+                export_mintpy_defsour(load_mintpy_defsour_config(cfg))
+
+            self.assertFalse((root / "export").exists())
+
+    def test_velocity_unit_and_grid_metadata_must_match_timeseries(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cfg = self.fixture(root)
+            with h5py.File(root / "velocity.h5", "r+") as handle:
+                handle["custom_velocity"].attrs["UNIT"] = "mm/year"
+            with self.assertRaisesRegex(ValueError, "velocity.*unit"):
+                export_mintpy_defsour(load_mintpy_defsour_config(cfg))
+            self.assertFalse((root / "export").exists())
+
+            cfg = self.fixture(root, output="grid-conflict")
+            with h5py.File(root / "velocity.h5", "r+") as handle:
+                handle.attrs["EPSG"] = 32647
+            with self.assertRaisesRegex(ValueError, "velocity.*EPSG"):
+                export_mintpy_defsour(load_mintpy_defsour_config(cfg))
+            self.assertFalse((root / "grid-conflict").exists())
 
 
 if __name__ == "__main__":

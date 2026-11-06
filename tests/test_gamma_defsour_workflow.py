@@ -37,6 +37,7 @@ prefix = defo_
 extension = .txt
 source_crs = EPSG:32647
 output_crs = EPSG:32647
+source_unit = m
 format = %.2f %.2f %.2f %.3f
 deformation_scale = 1000
 output_unit = mm
@@ -92,6 +93,29 @@ mode = {mode}
             after = {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in root.glob("*.bin")}
             self.assertEqual(after, before)
 
+    def test_output_directory_must_not_contain_cfg_or_source_inputs(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cfg = self.fixture(root)
+            cfg.write_text(cfg.read_text().replace("output_dir = export", "output_dir = ."))
+            protected = {
+                path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in root.iterdir()
+                if path.is_file()
+            }
+
+            with self.assertRaisesRegex(ValueError, "overlaps.*input"):
+                export_gamma_defsour(load_gamma_defsour_config(cfg))
+
+            self.assertEqual(
+                {
+                    path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+                    for path in root.iterdir()
+                    if path.is_file()
+                },
+                protected,
+            )
+
     def test_aligned_mode_creates_and_reuses_snapshot_template(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -113,6 +137,37 @@ mode = {mode}
             export_gamma_defsour(load_gamma_defsour_config(second_cfg))
             self.assertTrue((root / "aligned2/defsour_manifest.json").is_file())
 
+            conflicting_cfg = self.fixture(
+                root,
+                output="aligned3",
+                mode="aligned",
+                template=str(template),
+            )
+            conflicting_cfg.write_text(
+                conflicting_cfg.read_text().replace(
+                    "output_crs = EPSG:32647", "output_crs = EPSG:4326"
+                )
+            )
+            with self.assertRaisesRegex(ValueError, "template.*CRS"):
+                export_gamma_defsour(load_gamma_defsour_config(conflicting_cfg))
+
+    def test_aligned_output_keeps_the_requested_downsampled_shape(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cfg = self.fixture(
+                root,
+                output="aligned",
+                mode="aligned",
+                template="aligned/alignment_template.npz",
+            )
+            cfg.write_text(cfg.read_text().replace("factor = 1", "factor = 2"))
+
+            result = export_gamma_defsour(load_gamma_defsour_config(cfg))
+
+            self.assertEqual([epoch.point_count for epoch in result.epochs], [1, 1])
+            with np.load(root / "aligned/alignment_template.npz", allow_pickle=False) as archive:
+                self.assertEqual(archive["x"].shape, (1, 1))
+
     def test_late_invalid_epoch_preserves_previous_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -124,6 +179,25 @@ mode = {mode}
             with self.assertRaisesRegex(ValueError, "size mismatch"):
                 export_gamma_defsour(load_gamma_defsour_config(cfg))
             self.assertEqual(manifest.read_bytes(), before)
+
+    def test_export_invalid_points_writes_nan_skeleton_values(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cfg = self.fixture(root)
+            cfg.write_text(
+                cfg.read_text()
+                .replace("export_invalid_points = false", "export_invalid_points = true")
+                .replace("write_tif = true", "write_tif = false")
+            )
+
+            export_gamma_defsour(load_gamma_defsour_config(cfg))
+
+            first = np.loadtxt(root / "export/epochs/defo_20240101.txt")
+            second = np.loadtxt(root / "export/epochs/defo_20240113.txt")
+            self.assertEqual(first.shape, (6, 4))
+            self.assertTrue(np.isnan(first[4, 2:]).all())
+            self.assertTrue(np.isnan(second[2, 2:]).all())
+            self.assertTrue(np.isnan(second[4, 2:]).all())
 
     def test_radar_grid_uses_explicit_longitude_latitude_in_native_order(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -145,6 +219,7 @@ mode = {mode}
 dates = all
 source_crs = EPSG:4326
 output_crs = EPSG:4326
+source_unit = m
 deformation_scale = 1000
 output_unit = mm
 deformation_quantity = cumulative_displacement
@@ -187,6 +262,16 @@ mode = native
             np.testing.assert_allclose(exported[:, 1], latitude.reshape(-1), atol=1e-6)
             np.testing.assert_allclose(exported[:, 3], np.array([0, 1000, 2000, 3000, 4000, 5000]))
 
+            unsafe_tif = root / "radar-tif.cfg"
+            unsafe_tif.write_text(
+                cfg.read_text()
+                .replace("output_dir = export", "output_dir = export-tif")
+                .replace("write_tif = false", "write_tif = true")
+            )
+            with self.assertRaisesRegex(ValueError, "irregular.*aligned"):
+                export_gamma_defsour(load_gamma_defsour_config(unsafe_tif))
+            self.assertFalse((root / "export-tif").exists())
+
     def test_radar_grid_aligned_mode_creates_regular_reusable_template(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -211,6 +296,7 @@ mode = native
 dates = all
 source_crs = EPSG:4326
 output_crs = EPSG:4326
+source_unit = m
 deformation_scale = 1
 output_unit = m
 deformation_quantity = cumulative_displacement

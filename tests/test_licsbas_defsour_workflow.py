@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 import h5py
 import numpy as np
+import rasterio
 
 from insar_data_adapter.sources.licsbas import LiCSBASGridSource
 from insar_data_adapter.workflows.defsour.config import load_licsbas_defsour_config
@@ -111,6 +112,18 @@ refarea_dataset = custom_refarea
                 with self.assertRaisesRegex(OSError, "second-epoch"):
                     export_licsbas_defsour(config)
             self.assertEqual(manifest.read_bytes(), before)
+
+    def test_output_projection_preserves_downsampled_shape(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cfg = self.fixture(root)
+            cfg.write_text(cfg.read_text().replace("factor = 1", "factor = 2"))
+
+            result = export_licsbas_defsour(load_licsbas_defsour_config(cfg))
+
+            self.assertEqual([epoch.point_count for epoch in result.epochs], [2, 2])
+            with rasterio.open(root / "export/geotiff/licsbas_20240101.tif") as dataset:
+                self.assertEqual(dataset.shape, (1, 2))
 
     def test_refarea_and_declared_unit_conflicts_fail_before_output(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

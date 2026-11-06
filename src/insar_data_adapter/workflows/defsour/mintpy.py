@@ -18,7 +18,7 @@ from insar_data_adapter.sources.mintpy import MintPyGridSource
 from .config import MintPyDefsourConfig
 from .grid import GridProfile, prepare_defsour_epoch, select_downsample_factor
 from .models import DefsourEpochResult, DefsourSnapshotMetadata
-from .publication import publish_defsour_snapshot
+from .publication import publish_defsour_snapshot, validate_output_separation
 
 
 def _read_epoch(source: MintPyGridSource, index: int, chunk_rows: int) -> np.ndarray:
@@ -110,6 +110,87 @@ def _read_hdf5_static(
         return output
 
 
+def _text(value: object) -> str:
+    return value.decode("utf-8") if isinstance(value, bytes) else str(value)
+
+
+def _normalized_velocity_unit(value: str) -> str:
+    aliases = {
+        "m": "m",
+        "meter": "m",
+        "meters": "m",
+        "metre": "m",
+        "metres": "m",
+        "cm": "cm",
+        "centimeter": "cm",
+        "centimeters": "cm",
+        "centimetre": "cm",
+        "centimetres": "cm",
+        "mm": "mm",
+        "millimeter": "mm",
+        "millimeters": "mm",
+        "millimetre": "mm",
+        "millimetres": "mm",
+    }
+    normalized = value.strip().lower().replace(" ", "")
+    for suffix in ("/year", "/yr"):
+        if normalized.endswith(suffix):
+            length = normalized[: -len(suffix)]
+            if length in aliases:
+                return f"{aliases[length]}/year"
+    raise ValueError("MintPy velocity unit must be a supported length unit per year")
+
+
+def _read_velocity(
+    config: MintPyDefsourConfig,
+    source: MintPyGridSource,
+) -> np.ndarray:
+    assert config.velocity_file is not None
+    assert config.velocity_source_unit is not None
+    with h5py.File(config.velocity_file, "r") as handle:
+        if config.velocity_dataset not in handle:
+            raise ValueError(
+                f"velocity dataset /{config.velocity_dataset} is missing: {config.velocity_file}"
+            )
+        dataset = handle[config.velocity_dataset]
+        if dataset.shape != (source.rows, source.columns):
+            raise ValueError("velocity dataset shape does not match MintPy grid")
+        declared_unit = dataset.attrs.get(
+            "UNIT",
+            dataset.attrs.get("unit", handle.attrs.get("UNIT", handle.attrs.get("unit"))),
+        )
+        if declared_unit is None:
+            raise ValueError("MintPy velocity unit metadata is missing")
+        if _normalized_velocity_unit(_text(declared_unit)) != _normalized_velocity_unit(
+            config.velocity_source_unit
+        ):
+            raise ValueError("MintPy velocity unit conflicts with velocity_source_unit")
+        required = {"X_FIRST", "X_STEP", "Y_FIRST", "Y_STEP", "EPSG"}
+        missing = sorted(required.difference(handle.attrs.keys()))
+        if missing:
+            raise ValueError(f"MintPy velocity grid metadata is missing: {missing}")
+        expected_grid = {
+            "X_FIRST": float(source.x[0]),
+            "X_STEP": float(source.x[1] - source.x[0]),
+            "Y_FIRST": float(source.y[0]),
+            "Y_STEP": float(source.y[1] - source.y[0]),
+        }
+        for name, expected in expected_grid.items():
+            if not np.isclose(float(handle.attrs[name]), expected):
+                raise ValueError(f"MintPy velocity {name} conflicts with timeseries")
+        velocity_crs = _text(handle.attrs["EPSG"]).strip()
+        velocity_crs = (
+            f"EPSG:{velocity_crs}" if velocity_crs.isdigit() else velocity_crs
+        )
+        if CRS.from_user_input(velocity_crs) != CRS.from_user_input(source.crs):
+            raise ValueError("MintPy velocity EPSG conflicts with timeseries")
+        output = np.empty((source.rows, source.columns), dtype=np.float32)
+        for start in range(0, source.rows, config.chunk_rows):
+            stop = min(start + config.chunk_rows, source.rows)
+            output[start:stop] = dataset[start:stop, :]
+        return output
+
+
 def export_mintpy_defsour(config: MintPyDefsourConfig) -> DefsourSnapshotMetadata:
     """Export selected MintPy epochs without reading the full time cube."""
 
@@ -124,11 +205,20 @@ def export_mintpy_defsour(config: MintPyDefsourConfig) -> DefsourSnapshotMetadat
         height_dataset=config.height_dataset,
         mask_dataset=config.mask_dataset,
     ) as source:
+        validate_output_separation(
+            config.output_dir,
+            (
+                config.config_path,
+                config.timeseries_file,
+                config.geometry_file,
+                config.mask_file,
+                config.velocity_file,
+            ),
+        )
         if source.deformation_unit.lower() not in {"m", "meter", "meters", "metre", "metres"}:
             raise ValueError("MintPy source deformation unit must be metres for deformation_scale")
         indices = _selected(source, config)
         source_profile = _profile(source, config.source_crs)
-        destination_profile = _output_profile(source_profile, config.output_crs)
         height = _read_static(source, "read_height_rows", config.chunk_rows)
         mask = _read_static(source, "read_mask_rows", config.chunk_rows)
         valid_count = int(np.count_nonzero(mask & np.isfinite(height)))
@@ -139,6 +229,9 @@ def export_mintpy_defsour(config: MintPyDefsourConfig) -> DefsourSnapshotMetadat
             factor=config.factor,
             target_points=config.target_points,
             target_pixel_size=config.target_pixel_size,
+        )
+        destination_profile = _output_profile(
+            source_profile.downsampled(factor), config.output_crs
         )
 
         reference_index: int | None
@@ -166,7 +259,7 @@ def export_mintpy_defsour(config: MintPyDefsourConfig) -> DefsourSnapshotMetadat
             else config.spatial_reference
         )
         metadata = DefsourExportMetadata(
-            crs=config.output_crs,
+            crs=source_profile.crs if config.native_only else config.output_crs,
             deformation_unit=config.output_unit,
             deformation_quantity=config.deformation_quantity,
             height_unit=config.height_unit,
@@ -192,13 +285,7 @@ def export_mintpy_defsour(config: MintPyDefsourConfig) -> DefsourSnapshotMetadat
                 )
                 additional.append(relative)
             if config.write_velocity_tif:
-                assert config.velocity_file is not None
-                velocity = _read_hdf5_static(
-                    config.velocity_file,
-                    config.velocity_dataset,
-                    (source.rows, source.columns),
-                    config.chunk_rows,
-                ) * config.deformation_scale
+                velocity = _read_velocity(config, source) * config.deformation_scale
                 relative = Path("native/velocity.tif")
                 write_geotiff(
                     staging / relative,
@@ -282,6 +369,7 @@ def export_mintpy_defsour(config: MintPyDefsourConfig) -> DefsourSnapshotMetadat
                     "deformation_scale": config.deformation_scale,
                     "downsample_factor": factor,
                     "native_only": config.native_only,
+                    "native_crs": source_profile.crs,
                     "source_temporal_reference": source.temporal_reference,
                     "source_spatial_reference": source.spatial_reference,
                 },

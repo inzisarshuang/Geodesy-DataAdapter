@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import hashlib
 import json
 import math
 import re
@@ -92,6 +93,7 @@ _MINTPY_KEYS = _SHARED_KEYS | {
     "height_dataset",
     "mask_dataset",
     "velocity_dataset",
+    "velocity_source_unit",
     "write_native_tif",
     "write_velocity_tif",
     "write_dem_tif",
@@ -166,7 +168,7 @@ class GammaDefsourConfig(DefsourWorkflowConfig):
     source_manifest_digest: str | None
     source_width: int | None
     source_lines: int | None
-    source_unit: str | None
+    source_unit: str
 
 
 @dataclass(frozen=True)
@@ -180,6 +182,7 @@ class MintPyDefsourConfig(DefsourWorkflowConfig):
     height_dataset: str
     mask_dataset: str
     velocity_dataset: str
+    velocity_source_unit: str | None
     write_native_tif: bool
     write_velocity_tif: bool
     write_dem_tif: bool
@@ -267,22 +270,48 @@ def _output(values: dict[str, str], path: Path, source: str) -> Path:
 
 
 def _expected_scaled_unit(source_unit: str, scale: float) -> str:
-    normalized = source_unit.strip().lower()
+    normalized = _normalized_length_unit(source_unit)
     unit_to_metre = {
         "m": 1.0,
-        "meter": 1.0,
-        "meters": 1.0,
-        "metre": 1.0,
-        "metres": 1.0,
         "cm": 0.01,
         "mm": 0.001,
     }
-    if normalized not in unit_to_metre:
-        return f"scaled_from_{normalized}_by_{scale:g}"
     for output, metres in (("m", 1.0), ("cm", 0.01), ("mm", 0.001)):
         if np.isclose(scale, unit_to_metre[normalized] / metres):
             return output
     return f"scaled_from_{normalized}_by_{scale:g}"
+
+
+def _normalized_length_unit(value: str) -> str:
+    aliases = {
+        "m": "m",
+        "meter": "m",
+        "meters": "m",
+        "metre": "m",
+        "metres": "m",
+        "cm": "cm",
+        "centimeter": "cm",
+        "centimeters": "cm",
+        "centimetre": "cm",
+        "centimetres": "cm",
+        "mm": "mm",
+        "millimeter": "mm",
+        "millimeters": "mm",
+        "millimetre": "mm",
+        "millimetres": "mm",
+    }
+    normalized = value.strip().lower()
+    if normalized not in aliases:
+        raise ValueError("source_unit must be a supported m, cm, or mm unit")
+    return aliases[normalized]
+
+
+def _normalized_velocity_unit(value: str) -> str:
+    normalized = value.strip().lower().replace(" ", "")
+    for suffix in ("/year", "/yr"):
+        if normalized.endswith(suffix):
+            return f"{_normalized_length_unit(normalized[:-len(suffix)])}/year"
+    raise ValueError("velocity_source_unit must be a supported length unit per year")
 
 
 def _shared(
@@ -417,7 +446,9 @@ def _validate_manifest(
     dates: tuple[str, ...] | None,
     width: int | None,
     lines: int | None,
-    unit: str | None,
+    unit: str,
+    tab_file: Path,
+    dates_file: Path,
 ) -> str:
     try:
         payload = json.loads(source.read_text(encoding="utf-8"))
@@ -427,40 +458,113 @@ def _validate_manifest(
         raise ValueError("Analysis source manifest must declare status=complete")
     if payload.get("schema_version") != 2 or payload.get("method") != "gamma_mb":
         raise ValueError("Analysis source manifest method/schema is not gamma_mb v2")
-    manifest_dates = payload.get("acquisition_dates")
+    manifest_dates = payload.get("epochs")
     if not isinstance(manifest_dates, list) or any(
         not isinstance(item, str) or _DATE.fullmatch(item) is None
         for item in manifest_dates
     ):
         raise ValueError("Analysis source manifest dates are invalid")
-    if dates is not None and tuple(manifest_dates) != dates:
-        raise ValueError("Analysis source manifest dates disagree with CFG")
-    grid = payload.get("grid")
+    manifest_dates_tuple = tuple(manifest_dates)
+    if payload.get("epoch_count") != len(manifest_dates_tuple):
+        raise ValueError("Analysis source manifest epoch_count disagrees with dates")
+    try:
+        file_dates = tuple(
+            line.strip()
+            for line in dates_file.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        )
+    except (OSError, UnicodeError) as error:
+        raise ValueError("GAMMA dates_file is unreadable for manifest validation") from error
+    if file_dates != manifest_dates_tuple:
+        raise ValueError("Analysis source manifest dates disagree with dates_file")
+    if dates is not None and any(date not in manifest_dates_tuple for date in dates):
+        raise ValueError("Analysis source manifest dates disagree with CFG selection")
+
+    displacement = payload.get("displacement")
+    if not isinstance(displacement, dict) or displacement.get("enabled") is not True:
+        raise ValueError("Analysis source manifest displacement output is not enabled")
+    if displacement.get("quantity") != "cumulative_los_displacement":
+        raise ValueError("Analysis source manifest deformation quantity disagrees")
+    declared_unit = displacement.get("units")
+    if not isinstance(declared_unit, str) or _normalized_length_unit(
+        declared_unit
+    ) != _normalized_length_unit(unit):
+        raise ValueError("Analysis source manifest source_unit disagrees with CFG")
+
+    def product_paths(value: object, label: str) -> tuple[Path, ...]:
+        if not isinstance(value, list):
+            raise ValueError(f"Analysis source manifest {label} is invalid")
+        paths: list[Path] = []
+        manifest_root = source.parent.resolve()
+        for index, item in enumerate(value):
+            relative = _safe_manifest_path(item, f"{label}[{index}]")
+            resolved = (source.parent / relative).resolve()
+            if manifest_root != resolved and manifest_root not in resolved.parents:
+                raise ValueError(
+                    f"Analysis source manifest {label}[{index}] contains path traversal"
+                )
+            if not resolved.is_file():
+                raise ValueError(
+                    f"Analysis source manifest referenced file is missing: {relative}"
+                )
+            paths.append(resolved)
+        return tuple(paths)
+
+    radar_paths = product_paths(displacement.get("paths"), "displacement paths")
+    geocoded_paths = product_paths(
+        displacement.get("geocoded_paths"), "geocoded displacement paths"
+    )
+    if displacement.get("geocoded_enabled") is True and not geocoded_paths:
+        raise ValueError("Analysis source manifest geocoded displacement paths are empty")
+    try:
+        tab_paths = tuple(
+            (
+                Path(line.split()[0]).expanduser()
+                if Path(line.split()[0]).expanduser().is_absolute()
+                else tab_file.parent / Path(line.split()[0]).expanduser()
+            ).resolve()
+            for line in tab_file.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        )
+    except (OSError, UnicodeError, IndexError) as error:
+        raise ValueError("GAMMA tab_file is unreadable for manifest validation") from error
+    if tab_paths == radar_paths:
+        selected_grid_name = "grid"
+    elif tab_paths == geocoded_paths:
+        selected_grid_name = "map_grid"
+    else:
+        raise ValueError(
+            "Analysis source manifest displacement paths disagree with tab_file"
+        )
+    grid = payload.get(selected_grid_name)
     if not isinstance(grid, dict):
-        raise ValueError("Analysis source manifest grid is invalid")
+        raise ValueError(f"Analysis source manifest {selected_grid_name} is invalid")
     if width is not None and grid.get("width") != width:
         raise ValueError("Analysis source manifest grid width disagrees with CFG")
     if lines is not None and grid.get("lines") != lines:
         raise ValueError("Analysis source manifest grid lines disagree with CFG")
-    if payload.get("deformation_quantity") not in {None, "cumulative_displacement"}:
-        raise ValueError("Analysis source manifest deformation quantity disagrees")
+
     products = payload.get("products", {})
     if not isinstance(products, dict):
         raise ValueError("Analysis source manifest products are invalid")
     for name, product in products.items():
         if isinstance(product, dict) and "path" in product:
-            _safe_manifest_path(product["path"], f"product {name}")
-    if unit is not None:
-        declared_units = {
-            product.get("units")
-            for product in products.values()
-            if isinstance(product, dict) and product.get("units") is not None
-        }
-        if declared_units and unit not in declared_units:
-            raise ValueError("Analysis source manifest source_unit disagrees with CFG")
+            product_paths([product["path"]], f"product {name}")
+    product_paths(payload.get("required_products"), "required_products")
+
     digest = payload.get("scientific_manifest_digest")
     if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
         raise ValueError("Analysis source manifest digest is invalid")
+    scientific = {
+        key: value
+        for key, value in payload.items()
+        if key not in {"scientific_manifest_digest", "required_products", "figures"}
+    }
+    expected_digest = hashlib.sha256(
+        (json.dumps(scientific, sort_keys=True, indent=2) + "\n").encode()
+    ).hexdigest()
+    if digest != expected_digest:
+        raise ValueError("Analysis source manifest digest does not match content")
     return digest
 
 
@@ -483,10 +587,13 @@ def load_gamma_defsour_config(config_file: str | Path) -> GammaDefsourConfig:
             "mask_byte_order",
             "grid_registration",
             "mode",
+            "source_unit",
         },
         "GAMMA",
     )
-    shared = _shared(values, path, "gamma")
+    source_unit = _text(values, "source_unit")
+    _normalized_length_unit(source_unit)
+    shared = _shared(values, path, "gamma", source_unit=source_unit)
     registration = values["grid_registration"].lower()
     if registration != "pixel_center":
         raise ValueError("grid_registration must be pixel_center")
@@ -541,7 +648,6 @@ def load_gamma_defsour_config(config_file: str | Path) -> GammaDefsourConfig:
     )
     if (width is None) != (lines is None):
         raise ValueError("source_width and source_lines must be supplied together")
-    source_unit = values.get("source_unit")
     digest = None
     if source_manifest is not None:
         if not source_manifest.is_file():
@@ -552,6 +658,8 @@ def load_gamma_defsour_config(config_file: str | Path) -> GammaDefsourConfig:
             width=width,
             lines=lines,
             unit=source_unit,
+            tab_file=_resolve_path(values["tab_file"], path),
+            dates_file=_resolve_path(values["dates_file"], path),
         )
     return GammaDefsourConfig(
         **shared,
@@ -619,6 +727,21 @@ def load_mintpy_defsour_config(config_file: str | Path) -> MintPyDefsourConfig:
     )
     if write_velocity and velocity is None:
         raise ValueError("velocity_file is required when write_velocity_tif is true")
+    velocity_source_unit = values.get("velocity_source_unit")
+    if write_velocity and velocity_source_unit is None:
+        raise ValueError(
+            "velocity_source_unit is required when write_velocity_tif is true"
+        )
+    if velocity_source_unit is not None:
+        normalized_velocity = _normalized_velocity_unit(velocity_source_unit)
+        source_length_unit = normalized_velocity.split("/", 1)[0]
+        expected_velocity_output = _expected_scaled_unit(
+            source_length_unit, shared["deformation_scale"]
+        )
+        if expected_velocity_output != shared["output_unit"]:
+            raise ValueError(
+                "velocity_source_unit, deformation_scale, and output_unit disagree"
+            )
     return MintPyDefsourConfig(
         **shared,
         timeseries_file=_resolve_path(values["timeseries_file"], path),
@@ -630,6 +753,7 @@ def load_mintpy_defsour_config(config_file: str | Path) -> MintPyDefsourConfig:
         height_dataset=values.get("height_dataset", "height"),
         mask_dataset=values.get("mask_dataset", "mask"),
         velocity_dataset=values.get("velocity_dataset", "velocity"),
+        velocity_source_unit=velocity_source_unit,
         write_native_tif=write_native,
         write_velocity_tif=write_velocity,
         write_dem_tif=_parse_bool(values.get("write_dem_tif", "false"), "write_dem_tif"),

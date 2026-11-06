@@ -144,11 +144,14 @@ temporal/spatial reference, provenance, one downsample mode, aggregation,
 时空参考、来源、降采样方式、聚合、行块大小和覆盖策略。
 
 - GAMMA additionally requires tab/date/parameter/DEM/mask paths and explicit
-  binary dtype/byte order. Radar grids add paired longitude/latitude rasters
-  with their own dtype/order. `mode = aligned` requires an alignment template.
+  binary dtype/byte order plus `source_unit`. Radar grids add paired
+  longitude/latitude rasters with their own dtype/order. `mode = aligned`
+  requires an alignment template; irregular native grids cannot write a
+  GeoTIFF until aligned to a regular grid.
 - MintPy requires explicit time-series, geometry, and mask files plus dataset
   names. Native epoch/velocity/DEM GeoTIFFs are opt-in; `native_only = true`
-  requires native epoch GeoTIFF output.
+  requires native epoch GeoTIFF output. Velocity export also requires
+  `velocity_source_unit` and matching unit/grid metadata in the velocity HDF5.
 - LiCSBAS requires the input HDF5, dataset names including `refarea_dataset`,
   and `source_unit`. A declared source unit/CRS must agree with CFG.
 

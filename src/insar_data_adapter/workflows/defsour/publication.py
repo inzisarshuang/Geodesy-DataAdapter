@@ -14,6 +14,28 @@ from typing import Callable
 from .models import DefsourSnapshotMetadata
 
 
+def validate_output_separation(
+    output_dir: Path,
+    inputs: tuple[Path | None, ...],
+    *,
+    owned_output_paths: tuple[Path, ...] = (),
+) -> None:
+    """Reject snapshots that would replace any source or configuration input."""
+
+    output = Path(output_dir).expanduser().resolve()
+    owned = {Path(path).expanduser().resolve() for path in owned_output_paths}
+    for raw_input in inputs:
+        if raw_input is None:
+            continue
+        source = Path(raw_input).expanduser().resolve()
+        if source in owned:
+            continue
+        if source == output or output in source.parents:
+            raise ValueError(
+                f"Defsour output directory overlaps protected input: {source}"
+            )
+
+
 def _required_products(metadata: DefsourSnapshotMetadata) -> tuple[Path, ...]:
     products: list[Path] = []
     for epoch in metadata.epochs:
@@ -148,4 +170,4 @@ def publish_defsour_snapshot(
             shutil.rmtree(backup)
 
 
-__all__ = ["publish_defsour_snapshot"]
+__all__ = ["publish_defsour_snapshot", "validate_output_separation"]

@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 from affine import Affine
 
-from .grid import GridProfile
+from .grid import GridProfile, coordinate_arrays
 
 
 @dataclass(frozen=True)
@@ -31,6 +31,11 @@ class DefsourAlignmentTemplate:
             raise ValueError("alignment template coordinate shape must match profile")
         if not np.isfinite(x).all() or not np.isfinite(y).all():
             raise ValueError("alignment template coordinates must be finite")
+        expected_x, expected_y = coordinate_arrays(self.profile)
+        if not np.array_equal(x, expected_x) or not np.array_equal(y, expected_y):
+            raise ValueError(
+                "alignment template coordinates must match the profile affine transform"
+            )
         x = x.copy()
         y = y.copy()
         x.setflags(write=False)

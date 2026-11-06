@@ -105,7 +105,9 @@ All three commands select dates, apply the explicit temporal reference and
 scale, compose finite values with the configured mask, downsample/reproject,
 and publish `defsour_manifest.json` last. GAMMA also supports reusable aligned
 templates; MintPy can additionally publish native epoch, velocity, and DEM
-GeoTIFFs. No command searches for sibling inputs implicitly.
+GeoTIFFs. GAMMA requires an explicit source displacement unit, while MintPy
+velocity output requires explicit source units and matching HDF5 grid metadata.
+No command searches for sibling inputs implicitly.
 
 三个命令均按 CFG 选时期、时间参考与倍率，组合有限值和显式 mask，
 再执行降采样/重投影，最后写入 `defsour_manifest.json`。GAMMA 可复用对齐

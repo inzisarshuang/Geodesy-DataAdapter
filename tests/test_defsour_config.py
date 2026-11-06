@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import copy
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
@@ -54,6 +55,7 @@ class DefsourConfigTests(unittest.TestCase):
             "gamma.cfg",
             """tab_file = ../inputs/epochs.tab
 dates_file = ../inputs/dates.txt
+source_unit = m
 parameter_file = ../inputs/grid.dem_par
 height_file = ../inputs/height.bin
 mask_file = ../inputs/mask.bin
@@ -183,6 +185,21 @@ refarea_dataset = refarea
             with self.assertRaisesRegex(ValueError, "unknown cfg key"):
                 load_licsbas_defsour_config(licsbas)
 
+    def test_gamma_source_unit_is_required_and_controls_scaling(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            missing = self.gamma(root)
+            missing.write_text(missing.read_text().replace("source_unit = m\n", ""))
+            with self.assertRaisesRegex(ValueError, "source_unit"):
+                load_gamma_defsour_config(missing)
+
+            mismatched = self.gamma(root)
+            mismatched.write_text(
+                mismatched.read_text().replace("source_unit = m", "source_unit = mm")
+            )
+            with self.assertRaisesRegex(ValueError, "output_unit"):
+                load_gamma_defsour_config(mismatched)
+
     def test_gamma_explicit_coordinates_require_binary_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -208,48 +225,85 @@ refarea_dataset = refarea
             root = Path(directory)
             manifest = root / "inputs/timeseries_manifest.json"
             manifest.parent.mkdir()
+            displacement_dir = manifest.parent / "DISPLACEMENT"
+            displacement_dir.mkdir()
+            product_paths = [
+                "DISPLACEMENT/20240101.disp",
+                "DISPLACEMENT/20240113.disp",
+            ]
+            for relative in product_paths:
+                (manifest.parent / relative).write_bytes(b"product")
+            (manifest.parent / "epochs.tab").write_text(
+                "".join(f"{path}\n" for path in product_paths)
+            )
+            (manifest.parent / "dates.txt").write_text("20240101\n20240113\n")
             payload = {
                 "schema_version": 2,
                 "status": "complete",
                 "method": "gamma_mb",
-                "acquisition_dates": ["20240101", "20240113"],
+                "epochs": ["20240101", "20240113"],
+                "epoch_count": 2,
                 "grid": {"width": 3, "lines": 2},
-                "deformation_quantity": "cumulative_displacement",
-                "scientific_manifest_digest": "a" * 64,
-                "products": {"displacement_table": {"path": "DISPLACEMENT/displacement_tab", "units": "meter"}},
+                "map_grid": {"width": 6, "lines": 4},
+                "displacement": {
+                    "enabled": True,
+                    "geocoded_enabled": False,
+                    "quantity": "cumulative_los_displacement",
+                    "units": "meter",
+                    "paths": product_paths,
+                    "geocoded_paths": [],
+                },
+                "products": {},
             }
-            manifest.write_text(json.dumps(payload))
+            def write_manifest(value: dict[str, object], *, digest: str | None = None) -> None:
+                scientific = {
+                    key: item
+                    for key, item in value.items()
+                    if key not in {"scientific_manifest_digest", "required_products", "figures"}
+                }
+                value["scientific_manifest_digest"] = digest or hashlib.sha256(
+                    (json.dumps(scientific, sort_keys=True, indent=2) + "\n").encode()
+                ).hexdigest()
+                value["required_products"] = list(product_paths)
+                value["figures"] = []
+                manifest.write_text(json.dumps(value, sort_keys=True, indent=2) + "\n")
+
+            write_manifest(payload)
             cfg = self.gamma(
                 root,
-                "source_manifest = ../inputs/timeseries_manifest.json\nsource_width = 3\nsource_lines = 2\nsource_unit = meter\n",
+                "source_manifest = ../inputs/timeseries_manifest.json\nsource_width = 3\nsource_lines = 2\n",
             )
             loaded = load_gamma_defsour_config(cfg)
             self.assertEqual(loaded.source_manifest, manifest)
             for key, value, message in (
                 ("status", "incomplete", "complete"),
                 ("method", "stacking", "method"),
-                ("acquisition_dates", ["20240101"], "dates"),
-                ("scientific_manifest_digest", "bad", "digest"),
+                ("epochs", ["20240101"], "dates"),
             ):
                 with self.subTest(key=key):
-                    changed = dict(payload)
+                    changed = copy.deepcopy(payload)
                     changed[key] = value
-                    manifest.write_text(json.dumps(changed))
+                    if key == "epochs":
+                        changed["epoch_count"] = 1
+                    write_manifest(changed)
                     with self.assertRaisesRegex(ValueError, message):
                         load_gamma_defsour_config(cfg)
+            write_manifest(copy.deepcopy(payload), digest="bad")
+            with self.assertRaisesRegex(ValueError, "digest"):
+                load_gamma_defsour_config(cfg)
             changed = copy.deepcopy(payload)
             changed["grid"]["width"] = 4
-            manifest.write_text(json.dumps(changed))
+            write_manifest(changed)
             with self.assertRaisesRegex(ValueError, "grid width"):
                 load_gamma_defsour_config(cfg)
             changed = copy.deepcopy(payload)
-            changed["products"]["displacement_table"]["units"] = "centimeter"
-            manifest.write_text(json.dumps(changed))
+            changed["displacement"]["units"] = "centimeter"
+            write_manifest(changed)
             with self.assertRaisesRegex(ValueError, "source_unit"):
                 load_gamma_defsour_config(cfg)
             changed = copy.deepcopy(payload)
-            changed["products"]["displacement_table"]["path"] = "../escape.tab"
-            manifest.write_text(json.dumps(changed))
+            changed["displacement"]["paths"][0] = "../escape.bin"
+            write_manifest(changed)
             with self.assertRaisesRegex(ValueError, "traversal"):
                 load_gamma_defsour_config(cfg)
 
