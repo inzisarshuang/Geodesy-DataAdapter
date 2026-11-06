@@ -25,6 +25,14 @@ class AdapterProjectLayoutTests(unittest.TestCase):
                 layout.export("defsour.txt"),
                 root / "S1/ASCENDING_128/GAMMA/EXPORT/defsour.txt",
             )
+            self.assertEqual(
+                layout.defsour("gamma"),
+                root / "S1/ASCENDING_128/GAMMA/EXPORT/DEFSOUR/GAMMA",
+            )
+            self.assertEqual(
+                layout.defsour("mintpy"),
+                root / "S1/ASCENDING_128/GAMMA/EXPORT/DEFSOUR/MINTPY",
+            )
 
     def test_rejects_wrong_method_root_and_unsafe_names(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -38,6 +46,8 @@ class AdapterProjectLayoutTests(unittest.TestCase):
             )
             with self.assertRaisesRegex(ValueError, "filename"):
                 layout.canonical("../escape.h5")
+            with self.assertRaisesRegex(ValueError, "source"):
+                layout.defsour("../escape")
 
     def test_cfg_derives_default_but_explicit_output_wins(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

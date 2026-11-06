@@ -9,6 +9,7 @@ from pathlib import Path
 
 _CASE = re.compile(r"[A-Z0-9_]+")
 _METHOD = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
+_SOURCE = re.compile(r"[A-Za-z][A-Za-z0-9_.-]*")
 
 
 @dataclass(frozen=True)
@@ -57,6 +58,12 @@ class AdapterProjectLayout:
 
     def export(self, name: str) -> Path:
         return self.processing_root / "EXPORT" / self._filename(name)
+
+    def defsour(self, source: str) -> Path:
+        normalized = str(source).strip()
+        if _SOURCE.fullmatch(normalized) is None:
+            raise ValueError(f"Defsour source must be one safe component: {source!r}")
+        return self.processing_root / "EXPORT" / "DEFSOUR" / normalized.upper()
 
 
 __all__ = ["AdapterProjectLayout"]
