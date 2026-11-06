@@ -41,6 +41,7 @@ class LiCSBASGridSource:
         date_dataset: str = "imdates",
         height_dataset: str = "hgt",
         mask_dataset: str = "mask",
+        refarea_dataset: str = "refarea",
     ) -> None:
         """Retain a resolved input path and explicit dataset names."""
         self.path = Path(input_file).expanduser().resolve()
@@ -48,12 +49,14 @@ class LiCSBASGridSource:
         self.date_dataset = date_dataset.strip("/")
         self.height_dataset = height_dataset.strip("/")
         self.mask_dataset = mask_dataset.strip("/")
+        self.refarea_dataset = refarea_dataset.strip("/")
         if not all(
             (
                 self.deformation_dataset,
                 self.date_dataset,
                 self.height_dataset,
                 self.mask_dataset,
+                self.refarea_dataset,
             )
         ):
             raise ValueError("LiCSBAS dataset names must not be blank")
@@ -95,7 +98,7 @@ class LiCSBASGridSource:
             "corner_lat",
             "post_lon",
             "post_lat",
-            "refarea",
+            self.refarea_dataset,
         }
         missing = sorted(required.difference(handle.keys()))
         if missing:
@@ -115,6 +118,8 @@ class LiCSBASGridSource:
                 datetime.strptime(date, "%Y%m%d")
             except ValueError as error:
                 raise ValueError(f"invalid LiCSBAS YYYYMMDD date: {date!r}") from error
+        if len(set(self.dates)) != len(self.dates):
+            raise ValueError("LiCSBAS date dataset contains duplicate dates")
 
         expected_shape = (self.rows, self.columns)
         if handle[self.height_dataset].shape != expected_shape:
@@ -133,7 +138,7 @@ class LiCSBASGridSource:
         self.x = corner_lon + np.arange(self.columns, dtype=np.float64) * post_lon
         self.y = corner_lat + np.arange(self.rows, dtype=np.float64) * post_lat
 
-        refarea = _text(handle["refarea"][()]).strip()
+        refarea = _text(handle[self.refarea_dataset][()]).strip()
         match = _REFAREA_PATTERN.fullmatch(refarea)
         if match is None:
             raise ValueError(f"invalid LiCSBAS refarea: {refarea!r}")

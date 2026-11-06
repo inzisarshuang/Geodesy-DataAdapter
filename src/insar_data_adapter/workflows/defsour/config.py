@@ -20,7 +20,6 @@ from insar_data_adapter.config import (
     _read_strict_config,
     _resolve_path,
 )
-from insar_data_adapter.exporters.defsour import infer_deformation_unit_label
 from insar_data_adapter.project_layout import AdapterProjectLayout
 
 _DATE = re.compile(r"\d{8}\Z")
@@ -100,6 +99,7 @@ _MINTPY_KEYS = _SHARED_KEYS | {
 }
 _LICSBAS_KEYS = _SHARED_KEYS | {
     "input_file",
+    "source_unit",
     "deformation_dataset",
     "date_dataset",
     "height_dataset",
@@ -189,6 +189,7 @@ class MintPyDefsourConfig(DefsourWorkflowConfig):
 @dataclass(frozen=True)
 class LiCSBASDefsourConfig(DefsourWorkflowConfig):
     input_file: Path
+    source_unit: str
     deformation_dataset: str
     date_dataset: str
     height_dataset: str
@@ -265,7 +266,32 @@ def _output(values: dict[str, str], path: Path, source: str) -> Path:
     return layout.defsour(source)
 
 
-def _shared(values: dict[str, str], path: Path, source: str) -> dict[str, object]:
+def _expected_scaled_unit(source_unit: str, scale: float) -> str:
+    normalized = source_unit.strip().lower()
+    unit_to_metre = {
+        "m": 1.0,
+        "meter": 1.0,
+        "meters": 1.0,
+        "metre": 1.0,
+        "metres": 1.0,
+        "cm": 0.01,
+        "mm": 0.001,
+    }
+    if normalized not in unit_to_metre:
+        return f"scaled_from_{normalized}_by_{scale:g}"
+    for output, metres in (("m", 1.0), ("cm", 0.01), ("mm", 0.001)):
+        if np.isclose(scale, unit_to_metre[normalized] / metres):
+            return output
+    return f"scaled_from_{normalized}_by_{scale:g}"
+
+
+def _shared(
+    values: dict[str, str],
+    path: Path,
+    source: str,
+    *,
+    source_unit: str = "m",
+) -> dict[str, object]:
     _required(
         values,
         {
@@ -302,7 +328,7 @@ def _shared(values: dict[str, str], path: Path, source: str) -> dict[str, object
     except Exception as error:
         raise ValueError("source_crs and output_crs must be valid explicit CRS values") from error
     scale = _float(values, "deformation_scale", positive=True)
-    expected_unit = infer_deformation_unit_label(scale)
+    expected_unit = _expected_scaled_unit(source_unit, scale)
     if values["output_unit"] != expected_unit:
         raise ValueError(
             f"output_unit must match deformation_scale ({expected_unit}), got {values['output_unit']}"
@@ -614,11 +640,13 @@ def load_mintpy_defsour_config(config_file: str | Path) -> MintPyDefsourConfig:
 def load_licsbas_defsour_config(config_file: str | Path) -> LiCSBASDefsourConfig:
     path = Path(config_file).expanduser().resolve(strict=True)
     values = _read_strict_config(path, _LICSBAS_KEYS)
-    _required(values, {"input_file"}, "LiCSBAS")
-    shared = _shared(values, path, "licsbas")
+    _required(values, {"input_file", "source_unit"}, "LiCSBAS")
+    source_unit = _text(values, "source_unit")
+    shared = _shared(values, path, "licsbas", source_unit=source_unit)
     return LiCSBASDefsourConfig(
         **shared,
         input_file=_resolve_path(values["input_file"], path),
+        source_unit=source_unit,
         deformation_dataset=values.get("deformation_dataset", "cum"),
         date_dataset=values.get("date_dataset", "imdates"),
         height_dataset=values.get("height_dataset", "hgt"),

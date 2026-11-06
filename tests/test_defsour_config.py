@@ -94,6 +94,7 @@ native_only = false
             root,
             "licsbas.cfg",
             """input_file = ../inputs/cum.h5
+source_unit = m
 deformation_dataset = cum
 date_dataset = imdates
 height_dataset = hgt
