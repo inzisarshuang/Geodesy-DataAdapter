@@ -18,6 +18,7 @@ from __future__ import annotations
 from typing import Mapping
 
 import numpy as np
+from rasterio.control import GroundControlPoint
 from rasterio.enums import Resampling
 from rasterio.warp import reproject
 
@@ -138,3 +139,65 @@ def reproject_static_grid_to_profile(
     valid_output = (destination_valid > 0.5) & np.isfinite(destination)
     destination[~valid_output] = np.nan
     return destination, valid_output
+
+
+def reproject_geolocated_grid_to_profile(
+    dem: np.ndarray,
+    deform: np.ndarray,
+    valid: np.ndarray,
+    x: np.ndarray,
+    y: np.ndarray,
+    source_crs: str,
+    destination_profile: Mapping[str, object],
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Warp one curvilinear/geolocated grid onto an explicit regular profile."""
+
+    arrays = tuple(np.asarray(value) for value in (dem, deform, valid, x, y))
+    if any(value.ndim != 2 or value.shape != arrays[0].shape for value in arrays):
+        raise ValueError("geolocated arrays must be equally shaped two-dimensional grids")
+    coordinate_valid = np.isfinite(arrays[3]) & np.isfinite(arrays[4])
+    rows, columns = np.nonzero(coordinate_valid)
+    if rows.size < 6:
+        raise ValueError("geolocated reprojection requires at least six finite GCPs")
+    gcps = [
+        GroundControlPoint(
+            row=float(row) + 0.5,
+            col=float(column) + 0.5,
+            x=float(arrays[3][row, column]),
+            y=float(arrays[4][row, column]),
+        )
+        for row, column in zip(rows, columns)
+    ]
+    destination_shape = (
+        int(destination_profile["height"]),
+        int(destination_profile["width"]),
+    )
+    destination_transform = destination_profile.get("transform")
+    destination_crs = destination_profile.get("crs")
+    if destination_transform is None or destination_crs is None:
+        raise ValueError("destination profile requires transform and CRS")
+
+    valid_values = np.asarray(valid, dtype=bool) & coordinate_valid
+    outputs = []
+    for values, resampling, nodata in (
+        (np.where(valid_values, dem, np.nan).astype(np.float32), Resampling.bilinear, np.nan),
+        (np.where(valid_values, deform, np.nan).astype(np.float32), Resampling.bilinear, np.nan),
+        (valid_values.astype(np.float32), Resampling.nearest, 0.0),
+    ):
+        destination = np.full(destination_shape, nodata, dtype=np.float32)
+        reproject(
+            source=values,
+            destination=destination,
+            gcps=gcps,
+            src_crs=source_crs,
+            src_nodata=nodata,
+            dst_transform=destination_transform,
+            dst_crs=destination_crs,
+            dst_nodata=nodata,
+            resampling=resampling,
+        )
+        outputs.append(destination)
+    output_valid = (
+        (outputs[2] > 0.5) & np.isfinite(outputs[0]) & np.isfinite(outputs[1])
+    )
+    return outputs[0], outputs[1], output_valid

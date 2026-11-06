@@ -82,6 +82,12 @@ class GammaGeoGridSource:
         height_file: str | Path,
         mask_file: str | Path,
         *,
+        longitude_file: str | Path | None = None,
+        latitude_file: str | Path | None = None,
+        longitude_dtype: str | None = None,
+        longitude_byte_order: str | None = None,
+        latitude_dtype: str | None = None,
+        latitude_byte_order: str | None = None,
         deformation_dtype: str,
         deformation_byte_order: str,
         height_dtype: str,
@@ -95,6 +101,35 @@ class GammaGeoGridSource:
         self.parameter_path = Path(parameter_file).expanduser().resolve()
         self.height_path = Path(height_file).expanduser().resolve()
         self.mask_path = Path(mask_file).expanduser().resolve()
+        self.longitude_path = (
+            Path(longitude_file).expanduser().resolve()
+            if longitude_file is not None
+            else None
+        )
+        self.latitude_path = (
+            Path(latitude_file).expanduser().resolve()
+            if latitude_file is not None
+            else None
+        )
+        if (self.longitude_path is None) != (self.latitude_path is None):
+            raise ValueError("longitude_file and latitude_file must be supplied together")
+        if self.longitude_path is not None:
+            if None in {
+                longitude_dtype,
+                longitude_byte_order,
+                latitude_dtype,
+                latitude_byte_order,
+            }:
+                raise ValueError("explicit coordinate dtype and byte order are required")
+            self.longitude_dtype = _binary_dtype(
+                str(longitude_dtype), str(longitude_byte_order), "longitude"
+            )
+            self.latitude_dtype = _binary_dtype(
+                str(latitude_dtype), str(latitude_byte_order), "latitude"
+            )
+        else:
+            self.longitude_dtype = None
+            self.latitude_dtype = None
         self.deformation_dtype = _binary_dtype(
             deformation_dtype, deformation_byte_order, "deformation"
         )
@@ -126,26 +161,48 @@ class GammaGeoGridSource:
             "post_lon",
             "post_lat",
         }
-        missing = sorted(required_grid.difference(parameters))
-        if missing:
+        regular = required_grid.issubset(parameters)
+        if regular:
+            self.columns = int(_number(parameters, "width", int))
+            self.rows = int(_number(parameters, "nlines", int))
+        elif self.longitude_path is not None and {
+            "range_samples",
+            "azimuth_lines",
+        }.issubset(parameters):
+            self.columns = int(_number(parameters, "range_samples", int))
+            self.rows = int(_number(parameters, "azimuth_lines", int))
+        else:
+            missing = sorted(required_grid.difference(parameters))
             raise ValueError(
-                "GAMMA parameter file is not a regular geocoded lon/lat grid; "
-                f"missing: {missing}"
+                "GAMMA parameter file is not a regular geocoded grid and no "
+                f"explicit radar-grid coordinates were supplied; missing: {missing}"
             )
-        self.columns = int(_number(parameters, "width", int))
-        self.rows = int(_number(parameters, "nlines", int))
         if self.rows < 1 or self.columns < 1:
             raise ValueError("GAMMA width and nlines must be positive")
-        corner_lon = float(_number(parameters, "corner_lon", float))
-        corner_lat = float(_number(parameters, "corner_lat", float))
-        post_lon = float(_number(parameters, "post_lon", float))
-        post_lat = float(_number(parameters, "post_lat", float))
-        if not np.isfinite([corner_lon, corner_lat, post_lon, post_lat]).all():
-            raise ValueError("GAMMA grid coordinates must be finite")
-        if post_lon == 0 or post_lat == 0:
-            raise ValueError("GAMMA post_lon and post_lat must be non-zero")
-        self.x = corner_lon + np.arange(self.columns, dtype=np.float64) * post_lon
-        self.y = corner_lat + np.arange(self.rows, dtype=np.float64) * post_lat
+        if regular and self.longitude_path is None:
+            corner_lon = float(_number(parameters, "corner_lon", float))
+            corner_lat = float(_number(parameters, "corner_lat", float))
+            post_lon = float(_number(parameters, "post_lon", float))
+            post_lat = float(_number(parameters, "post_lat", float))
+            if not np.isfinite([corner_lon, corner_lat, post_lon, post_lat]).all():
+                raise ValueError("GAMMA grid coordinates must be finite")
+            if post_lon == 0 or post_lat == 0:
+                raise ValueError("GAMMA post_lon and post_lat must be non-zero")
+            self.x = corner_lon + np.arange(self.columns, dtype=np.float64) * post_lon
+            self.y = corner_lat + np.arange(self.rows, dtype=np.float64) * post_lat
+        else:
+            assert self.longitude_path is not None
+            assert self.latitude_path is not None
+            assert self.longitude_dtype is not None
+            assert self.latitude_dtype is not None
+            self._validate_binary_size(
+                self.longitude_path, self.longitude_dtype, "longitude"
+            )
+            self._validate_binary_size(
+                self.latitude_path, self.latitude_dtype, "latitude"
+            )
+            self.x = np.empty((self.rows, self.columns), dtype=np.float64)
+            self.y = np.empty((self.rows, self.columns), dtype=np.float64)
         if "EPSG" in parameters:
             epsg = str(_number(parameters, "EPSG", int))
             self.declared_crs = f"EPSG:{epsg}"
@@ -244,6 +301,32 @@ class GammaGeoGridSource:
             self.mask_path, self.mask_dtype, row_start, row_stop
         )
         return np.isfinite(values) & (values > 0)
+
+    def read_longitude_rows(self, row_start: int, row_stop: int) -> np.ndarray:
+        """Read explicit longitude rows for a radar-coordinate grid."""
+        if self.longitude_path is None or self.longitude_dtype is None:
+            raise ValueError("explicit longitude_file is not configured")
+        start, stop = self._row_range(row_start, row_stop)
+        mapped = np.memmap(
+            self.longitude_path,
+            dtype=self.longitude_dtype,
+            mode="r",
+            shape=(self.rows, self.columns),
+        )
+        return np.asarray(mapped[start:stop, :], dtype=np.float64).copy()
+
+    def read_latitude_rows(self, row_start: int, row_stop: int) -> np.ndarray:
+        """Read explicit latitude rows for a radar-coordinate grid."""
+        if self.latitude_path is None or self.latitude_dtype is None:
+            raise ValueError("explicit latitude_file is not configured")
+        start, stop = self._row_range(row_start, row_stop)
+        mapped = np.memmap(
+            self.latitude_path,
+            dtype=self.latitude_dtype,
+            mode="r",
+            shape=(self.rows, self.columns),
+        )
+        return np.asarray(mapped[start:stop, :], dtype=np.float64).copy()
 
     def close(self) -> None:
         """Deactivate the source; memmaps are scoped to individual row reads."""

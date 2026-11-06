@@ -182,6 +182,26 @@ refarea_dataset = refarea
             with self.assertRaisesRegex(ValueError, "unknown cfg key"):
                 load_licsbas_defsour_config(licsbas)
 
+    def test_gamma_explicit_coordinates_require_binary_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cfg = self.gamma(
+                root,
+                "longitude_file = ../inputs/lon.bin\n"
+                "latitude_file = ../inputs/lat.bin\n"
+                "longitude_dtype = float64\n"
+                "longitude_byte_order = big\n"
+                "latitude_dtype = float64\n"
+                "latitude_byte_order = little\n",
+            )
+            loaded = load_gamma_defsour_config(cfg)
+            self.assertEqual(loaded.longitude_dtype, "float64")
+            self.assertEqual(loaded.latitude_byte_order, "little")
+
+            cfg.write_text(cfg.read_text().replace("longitude_dtype = float64\n", ""))
+            with self.assertRaisesRegex(ValueError, "longitude_dtype"):
+                load_gamma_defsour_config(cfg)
+
     def test_optional_analysis_manifest_is_validated_without_overriding_cfg(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -125,6 +125,163 @@ mode = {mode}
                 export_gamma_defsour(load_gamma_defsour_config(cfg))
             self.assertEqual(manifest.read_bytes(), before)
 
+    def test_radar_grid_uses_explicit_longitude_latitude_in_native_order(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            np.array([[0, 1, 2], [3, 4, 5]], dtype=">f4").tofile(root / "D1.bin")
+            np.array([[0, 2, 4], [6, 8, 10]], dtype=">f4").tofile(root / "D2.bin")
+            np.array([[10, 11, 12], [13, 14, 15]], dtype=">f4").tofile(root / "height.bin")
+            np.ones((2, 3), dtype=np.uint8).tofile(root / "mask.bin")
+            longitude = np.array([[100.0, 100.1, 100.2], [100.01, 100.11, 100.21]])
+            latitude = np.array([[35.0, 35.0, 35.0], [34.9, 34.9, 34.9]])
+            longitude.astype(">f8").tofile(root / "longitude.bin")
+            latitude.astype(">f8").tofile(root / "latitude.bin")
+            (root / "epochs.tab").write_text("D1.bin\nD2.bin\n")
+            (root / "dates.txt").write_text("20240101\n20240113\n")
+            (root / "radar.par").write_text("range_samples: 3\nazimuth_lines: 2\n")
+            cfg = root / "radar.cfg"
+            cfg.write_text(
+                """output_dir = export
+dates = all
+source_crs = EPSG:4326
+output_crs = EPSG:4326
+deformation_scale = 1000
+output_unit = mm
+deformation_quantity = cumulative_displacement
+height_unit = m
+los_positive = toward_satellite
+nodata_policy = explicit mask
+temporal_reference = first
+spatial_reference = none
+source_provenance = synthetic radar GAMMA
+downsample_mode = factor
+factor = 1
+write_tif = false
+overwrite = true
+tab_file = epochs.tab
+dates_file = dates.txt
+parameter_file = radar.par
+height_file = height.bin
+mask_file = mask.bin
+longitude_file = longitude.bin
+latitude_file = latitude.bin
+longitude_dtype = float64
+longitude_byte_order = big
+latitude_dtype = float64
+latitude_byte_order = big
+deformation_dtype = float32
+deformation_byte_order = big
+height_dtype = float32
+height_byte_order = big
+mask_dtype = uint8
+mask_byte_order = native
+grid_registration = pixel_center
+mode = native
+"""
+            )
+
+            export_gamma_defsour(load_gamma_defsour_config(cfg))
+
+            exported = np.loadtxt(root / "export/epochs/defsour_20240113.txt")
+            np.testing.assert_allclose(exported[:, 0], longitude.reshape(-1), atol=1e-6)
+            np.testing.assert_allclose(exported[:, 1], latitude.reshape(-1), atol=1e-6)
+            np.testing.assert_allclose(exported[:, 3], np.array([0, 1000, 2000, 3000, 4000, 5000]))
+
+    def test_radar_grid_aligned_mode_creates_regular_reusable_template(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shape = (3, 3)
+            np.arange(9, dtype=">f4").reshape(shape).tofile(root / "D1.bin")
+            (np.arange(9, dtype=np.float32) * 2).astype(">f4").reshape(shape).tofile(root / "D2.bin")
+            np.arange(10, 19, dtype=">f4").reshape(shape).tofile(root / "height.bin")
+            np.ones(shape, dtype=np.uint8).tofile(root / "mask.bin")
+            rows, columns = np.indices(shape)
+            longitude = 100.0 + columns * 0.1 + rows * 0.01
+            latitude = 35.0 - rows * 0.1 + columns * 0.002
+            longitude.astype(">f8").tofile(root / "longitude.bin")
+            latitude.astype(">f8").tofile(root / "latitude.bin")
+            (root / "epochs.tab").write_text("D1.bin\nD2.bin\n")
+            (root / "dates.txt").write_text("20240101\n20240113\n")
+            (root / "radar.par").write_text("range_samples: 3\nazimuth_lines: 3\n")
+
+            def write_cfg(name: str, output: str, template: str) -> Path:
+                cfg = root / name
+                cfg.write_text(
+                    f"""output_dir = {output}
+dates = all
+source_crs = EPSG:4326
+output_crs = EPSG:4326
+deformation_scale = 1
+output_unit = m
+deformation_quantity = cumulative_displacement
+height_unit = m
+los_positive = toward_satellite
+nodata_policy = explicit mask
+temporal_reference = preserve
+spatial_reference = none
+source_provenance = synthetic radar GAMMA
+downsample_mode = factor
+factor = 1
+write_tif = true
+overwrite = true
+tab_file = epochs.tab
+dates_file = dates.txt
+parameter_file = radar.par
+height_file = height.bin
+mask_file = mask.bin
+longitude_file = longitude.bin
+latitude_file = latitude.bin
+longitude_dtype = float64
+longitude_byte_order = big
+latitude_dtype = float64
+latitude_byte_order = big
+deformation_dtype = float32
+deformation_byte_order = big
+height_dtype = float32
+height_byte_order = big
+mask_dtype = uint8
+mask_byte_order = native
+grid_registration = pixel_center
+mode = aligned
+alignment_template = {template}
+"""
+                )
+                return cfg
+
+            first = write_cfg("first.cfg", "aligned1", "aligned1/alignment_template.npz")
+            export_gamma_defsour(load_gamma_defsour_config(first))
+            template = root / "aligned1/alignment_template.npz"
+            self.assertTrue(template.is_file())
+            self.assertTrue((root / "aligned1/geotiff/defsour_20240113.tif").is_file())
+
+            longitude += 0.02
+            longitude.astype(">f8").tofile(root / "longitude.bin")
+            second = write_cfg("second.cfg", "aligned2", str(template))
+            result = export_gamma_defsour(load_gamma_defsour_config(second))
+            self.assertTrue(result.transformations["template_reused"])
+
+    def test_regular_grid_is_reprojected_to_explicit_output_crs(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cfg = self.fixture(root)
+            cfg.write_text(
+                cfg.read_text()
+                .replace("source_crs = EPSG:32647", "source_crs = EPSG:4326")
+                .replace("output_crs = EPSG:32647", "output_crs = EPSG:3857")
+            )
+            parameter = root / "grid.dem_par"
+            parameter.write_text(
+                parameter.read_text()
+                .replace("EPSG: 32647", "EPSG: 4326")
+                .replace("corner_lon: 100", "corner_lon: 10")
+                .replace("corner_lat: 500", "corner_lat: 40")
+                .replace("post_lon: 10", "post_lon: 0.1")
+                .replace("post_lat: -10", "post_lat: -0.1")
+            )
+            export_gamma_defsour(load_gamma_defsour_config(cfg))
+            exported = np.loadtxt(root / "export/epochs/defo_20240101.txt")
+            self.assertGreater(exported[0, 0], 1_000_000)
+
 
 if __name__ == "__main__":
     unittest.main()

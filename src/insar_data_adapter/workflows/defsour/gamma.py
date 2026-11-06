@@ -6,12 +6,21 @@ from pathlib import Path
 
 import numpy as np
 from affine import Affine
+from pyproj import Transformer
+from rasterio.transform import array_bounds
+from rasterio.warp import calculate_default_transform
 
 from insar_data_adapter.exporters.defsour import (
     DefsourExportMetadata,
     write_defsour_grid,
 )
 from insar_data_adapter.exporters.geotiff import write_geotiff
+from insar_data_adapter.grid import (
+    aggregate_grid_array,
+    build_defsour_valid_mask,
+    downsample_data_grid,
+)
+from insar_data_adapter.raster import reproject_geolocated_grid_to_profile
 from insar_data_adapter.sources.gamma import GammaGeoGridSource
 
 from .alignment import (
@@ -20,7 +29,13 @@ from .alignment import (
     save_alignment_template,
 )
 from .config import GammaDefsourConfig
-from .grid import GridProfile, prepare_defsour_epoch, select_downsample_factor
+from .grid import (
+    GridProfile,
+    PreparedDefsourGrid,
+    coordinate_arrays,
+    prepare_defsour_epoch,
+    select_downsample_factor,
+)
 from .models import DefsourEpochResult, DefsourSnapshotMetadata
 from .publication import publish_defsour_snapshot
 
@@ -43,9 +58,29 @@ def _read_static(source: GammaGeoGridSource, method: str, chunk_rows: int) -> np
     return output
 
 
-def _source_profile(source: GammaGeoGridSource, config: GammaDefsourConfig) -> GridProfile:
+def _read_coordinates(
+    source: GammaGeoGridSource, config: GammaDefsourConfig
+) -> tuple[np.ndarray, np.ndarray] | None:
+    if config.longitude_file is None:
+        return None
+    longitude = np.empty((source.rows, source.columns), dtype=np.float64)
+    latitude = np.empty((source.rows, source.columns), dtype=np.float64)
+    for start in range(0, source.rows, config.chunk_rows):
+        stop = min(start + config.chunk_rows, source.rows)
+        longitude[start:stop] = source.read_longitude_rows(start, stop)
+        latitude[start:stop] = source.read_latitude_rows(start, stop)
+    transformer = Transformer.from_crs(
+        config.source_crs, config.output_crs, always_xy=True
+    )
+    x, y = transformer.transform(longitude, latitude)
+    return np.asarray(x, dtype=np.float64), np.asarray(y, dtype=np.float64)
+
+
+def _source_profile(
+    source: GammaGeoGridSource, config: GammaDefsourConfig
+) -> GridProfile | None:
     if source.x.ndim != 1 or source.y.ndim != 1:
-        raise ValueError("irregular GAMMA coordinates require explicit radar-grid support")
+        return None
     if source.columns < 2 or source.rows < 2:
         raise ValueError("GAMMA Defsour grid requires at least two rows and columns")
     x_step = float(source.x[1] - source.x[0])
@@ -82,6 +117,136 @@ def _source_profile(source: GammaGeoGridSource, config: GammaDefsourConfig) -> G
     )
 
 
+def _irregular_profile(
+    x: np.ndarray, y: np.ndarray, config: GammaDefsourConfig
+) -> GridProfile:
+    finite = np.isfinite(x) & np.isfinite(y)
+    if not np.any(finite):
+        raise ValueError("explicit GAMMA coordinates contain no finite points")
+    horizontal = np.hypot(np.diff(x, axis=1), np.diff(y, axis=1))
+    vertical = np.hypot(np.diff(x, axis=0), np.diff(y, axis=0))
+    sizes = np.concatenate((horizontal[np.isfinite(horizontal)], vertical[np.isfinite(vertical)]))
+    sizes = sizes[sizes > 0]
+    if sizes.size == 0:
+        raise ValueError("explicit GAMMA coordinates do not define pixel spacing")
+    pixel_size = float(np.median(sizes))
+    return GridProfile(
+        x.shape[0],
+        x.shape[1],
+        config.output_crs,
+        Affine(
+            pixel_size,
+            0.0,
+            float(np.nanmin(x[finite])) - pixel_size / 2.0,
+            0.0,
+            -pixel_size,
+            float(np.nanmax(y[finite])) + pixel_size / 2.0,
+        ),
+        config.grid_registration,
+    )
+
+
+def _output_profile(profile: GridProfile, output_crs: str) -> GridProfile:
+    if profile.crs == GridProfile(
+        profile.height,
+        profile.width,
+        output_crs,
+        profile.transform,
+        profile.registration,
+    ).crs:
+        return profile
+    left, bottom, right, top = array_bounds(
+        profile.height, profile.width, profile.transform
+    )
+    transform, width, height = calculate_default_transform(
+        profile.crs,
+        output_crs,
+        profile.width,
+        profile.height,
+        left,
+        bottom,
+        right,
+        top,
+    )
+    return GridProfile(height, width, output_crs, transform, profile.registration)
+
+
+def _prepare_irregular_native(
+    x: np.ndarray,
+    y: np.ndarray,
+    height: np.ndarray,
+    deformation: np.ndarray,
+    valid: np.ndarray,
+    profile: GridProfile,
+    *,
+    factor: int,
+    aggregation: str,
+) -> PreparedDefsourGrid:
+    combined = build_defsour_valid_mask(
+        x, y, height, deformation, valid_mask=valid
+    )
+    down_height, down_deformation, down_valid = downsample_data_grid(
+        height, deformation, combined, factor, aggregation
+    )
+    if factor == 1:
+        down_x = np.asarray(x)
+        down_y = np.asarray(y)
+    else:
+        down_x = aggregate_grid_array(x, combined, factor, aggregation)
+        down_y = aggregate_grid_array(y, combined, factor, aggregation)
+    down_valid &= np.isfinite(down_x) & np.isfinite(down_y)
+    return PreparedDefsourGrid(
+        x=down_x,
+        y=down_y,
+        height=down_height,
+        deformation=down_deformation,
+        valid=down_valid,
+        profile=profile.downsampled(factor),
+    )
+
+
+def _prepare_irregular_aligned(
+    x: np.ndarray,
+    y: np.ndarray,
+    height: np.ndarray,
+    deformation: np.ndarray,
+    valid: np.ndarray,
+    profile: GridProfile,
+    *,
+    factor: int,
+    aggregation: str,
+    destination_profile: GridProfile,
+) -> PreparedDefsourGrid:
+    native = _prepare_irregular_native(
+        x,
+        y,
+        height,
+        deformation,
+        valid,
+        profile,
+        factor=factor,
+        aggregation=aggregation,
+    )
+    out_height, out_deformation, out_valid = reproject_geolocated_grid_to_profile(
+        native.height,
+        native.deformation,
+        native.valid,
+        native.x,
+        native.y,
+        profile.crs,
+        destination_profile.rasterio_profile(),
+    )
+    out_x, out_y = coordinate_arrays(destination_profile)
+    return PreparedDefsourGrid(
+        out_x,
+        out_y,
+        out_height,
+        out_deformation,
+        out_valid,
+        destination_profile,
+    )
+
+
 def _selected(source: GammaGeoGridSource, config: GammaDefsourConfig) -> tuple[int, ...]:
     if config.dates is None:
         return tuple(range(len(source.dates)))
@@ -103,6 +268,12 @@ def export_gamma_defsour(config: GammaDefsourConfig) -> DefsourSnapshotMetadata:
         config.parameter_file,
         config.height_file,
         config.mask_file,
+        longitude_file=config.longitude_file,
+        latitude_file=config.latitude_file,
+        longitude_dtype=config.longitude_dtype,
+        longitude_byte_order=config.longitude_byte_order,
+        latitude_dtype=config.latitude_dtype,
+        latitude_byte_order=config.latitude_byte_order,
         deformation_dtype=config.deformation_dtype,
         deformation_byte_order=config.deformation_byte_order,
         height_dtype=config.height_dtype,
@@ -112,6 +283,17 @@ def export_gamma_defsour(config: GammaDefsourConfig) -> DefsourSnapshotMetadata:
     ) as source:
         indices = _selected(source, config)
         source_profile = _source_profile(source, config)
+        coordinates = _read_coordinates(source, config)
+        factor_profile = (
+            source_profile
+            if source_profile is not None
+            else _irregular_profile(*coordinates, config)  # type: ignore[arg-type]
+        )
+        regular_output_profile = (
+            _output_profile(source_profile, config.output_crs)
+            if source_profile is not None
+            else None
+        )
         height = _read_static(source, "read_height_rows", config.chunk_rows)
         mask = _read_static(source, "read_mask_rows", config.chunk_rows)
         if config.height_nodata is not None:
@@ -131,7 +313,7 @@ def export_gamma_defsour(config: GammaDefsourConfig) -> DefsourSnapshotMetadata:
             reference = _read_epoch(source, reference_index, config.chunk_rows)
         factor = select_downsample_factor(
             config.downsample_mode,
-            source_profile=source_profile,
+            source_profile=factor_profile,
             valid_count=int(np.count_nonzero(mask)),
             factor=config.factor,
             target_points=config.target_points,
@@ -182,15 +364,53 @@ def export_gamma_defsour(config: GammaDefsourConfig) -> DefsourSnapshotMetadata:
                         valid &= reference != config.deformation_nodata
                     deformation = deformation - reference
                 deformation = deformation * config.deformation_scale
-                prepared = prepare_defsour_epoch(
-                    height,
-                    deformation,
-                    valid,
-                    source_profile,
-                    factor=factor,
-                    aggregation=config.aggregation,
-                    destination_profile=(None if template is None else template.profile),
-                )
+                if coordinates is None:
+                    assert source_profile is not None
+                    destination = (
+                        template.profile
+                        if template is not None
+                        else (
+                            regular_output_profile
+                            if config.mode == "aligned"
+                            or regular_output_profile != source_profile
+                            else None
+                        )
+                    )
+                    prepared = prepare_defsour_epoch(
+                        height,
+                        deformation,
+                        valid,
+                        source_profile,
+                        factor=factor,
+                        aggregation=config.aggregation,
+                        destination_profile=destination,
+                    )
+                else:
+                    if config.mode == "aligned":
+                        prepared = _prepare_irregular_aligned(
+                            *coordinates,
+                            height,
+                            deformation,
+                            valid,
+                            factor_profile,
+                            factor=factor,
+                            aggregation=config.aggregation,
+                            destination_profile=(
+                                template.profile
+                                if template is not None
+                                else factor_profile.downsampled(factor)
+                            ),
+                        )
+                    else:
+                        prepared = _prepare_irregular_native(
+                            *coordinates,
+                            height,
+                            deformation,
+                            valid,
+                            factor_profile,
+                            factor=factor,
+                            aggregation=config.aggregation,
+                        )
                 if config.mode == "aligned" and template is None:
                     template = DefsourAlignmentTemplate(
                         prepared.profile, factor, prepared.x, prepared.y

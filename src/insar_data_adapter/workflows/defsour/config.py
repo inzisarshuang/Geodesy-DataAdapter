@@ -62,6 +62,10 @@ _GAMMA_KEYS = _SHARED_KEYS | {
     "mask_file",
     "longitude_file",
     "latitude_file",
+    "longitude_dtype",
+    "longitude_byte_order",
+    "latitude_dtype",
+    "latitude_byte_order",
     "deformation_dtype",
     "deformation_byte_order",
     "height_dtype",
@@ -142,6 +146,10 @@ class GammaDefsourConfig(DefsourWorkflowConfig):
     mask_file: Path
     longitude_file: Path | None
     latitude_file: Path | None
+    longitude_dtype: str | None
+    longitude_byte_order: str | None
+    latitude_dtype: str | None
+    latitude_byte_order: str | None
     deformation_dtype: str
     deformation_byte_order: str
     height_dtype: str
@@ -478,6 +486,18 @@ def load_gamma_defsour_config(config_file: str | Path) -> GammaDefsourConfig:
     )
     if (longitude is None) != (latitude is None):
         raise ValueError("longitude_file and latitude_file must be supplied together")
+    coordinate_keys = {
+        "longitude_dtype",
+        "longitude_byte_order",
+        "latitude_dtype",
+        "latitude_byte_order",
+    }
+    if longitude is not None:
+        _required(values, coordinate_keys, "GAMMA coordinate")
+    elif coordinate_keys.intersection(values):
+        raise ValueError(
+            "longitude/latitude dtype and byte order require coordinate files"
+        )
     source_manifest = (
         _resolve_path(values["source_manifest"], path)
         if "source_manifest" in values
@@ -516,6 +536,18 @@ def load_gamma_defsour_config(config_file: str | Path) -> GammaDefsourConfig:
         mask_file=_resolve_path(values["mask_file"], path),
         longitude_file=longitude,
         latitude_file=latitude,
+        longitude_dtype=values.get("longitude_dtype"),
+        longitude_byte_order=(
+            _byte_order(values, "longitude_byte_order")
+            if "longitude_byte_order" in values
+            else None
+        ),
+        latitude_dtype=values.get("latitude_dtype"),
+        latitude_byte_order=(
+            _byte_order(values, "latitude_byte_order")
+            if "latitude_byte_order" in values
+            else None
+        ),
         deformation_dtype=values["deformation_dtype"],
         deformation_byte_order=_byte_order(values, "deformation_byte_order"),
         height_dtype=values["height_dtype"],
