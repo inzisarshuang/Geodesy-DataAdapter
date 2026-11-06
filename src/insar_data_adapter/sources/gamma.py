@@ -65,9 +65,10 @@ def _binary_dtype(name: str, byte_order: str, label: str) -> np.dtype:
         raise ValueError(f"invalid {label}_dtype: {name!r}") from error
     if dtype.kind not in {"f", "i", "u"} or dtype.itemsize not in {1, 2, 4, 8}:
         raise ValueError(f"{label}_dtype must be a fixed-size real numeric type")
-    if byte_order not in {"big", "little"}:
-        raise ValueError(f"{label}_byte_order must be big or little")
-    return dtype.newbyteorder(">" if byte_order == "big" else "<")
+    if byte_order not in {"big", "little", "native"}:
+        raise ValueError(f"{label}_byte_order must be big, little, or native")
+    marker = {"big": ">", "little": "<", "native": "="}[byte_order]
+    return dtype.newbyteorder(marker)
 
 
 class GammaGeoGridSource:
