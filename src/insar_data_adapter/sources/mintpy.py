@@ -34,6 +34,8 @@ class MintPyGridSource:
         geometry_file: str | Path | None = None,
         mask_file: str | Path | None = None,
         *,
+        timeseries_dataset: str = "timeseries",
+        date_dataset: str = "date",
         height_dataset: str = "height",
         mask_dataset: str = "mask",
     ) -> None:
@@ -47,10 +49,19 @@ class MintPyGridSource:
         self.mask_path = (
             Path(mask_file).expanduser().resolve() if mask_file is not None else None
         )
+        self.timeseries_dataset = timeseries_dataset.strip("/")
+        self.date_dataset = date_dataset.strip("/")
         self.height_dataset = height_dataset.strip("/")
         self.mask_dataset = mask_dataset.strip("/")
-        if not self.height_dataset or not self.mask_dataset:
-            raise ValueError("height_dataset and mask_dataset must not be blank")
+        if not all(
+            (
+                self.timeseries_dataset,
+                self.date_dataset,
+                self.height_dataset,
+                self.mask_dataset,
+            )
+        ):
+            raise ValueError("MintPy dataset names must not be blank")
         self._timeseries_handle: h5py.File | None = None
         self._geometry_handle: h5py.File | None = None
         self._mask_handle: h5py.File | None = None
@@ -84,15 +95,15 @@ class MintPyGridSource:
     def _validate(self) -> None:
         """Require geocoded axes, units, CRS, references, and consistent datasets."""
         handle = self._require_timeseries()
-        if "timeseries" not in handle or "date" not in handle:
+        if self.timeseries_dataset not in handle or self.date_dataset not in handle:
             raise ValueError(f"not a MintPy time-series HDF5: {self.timeseries_path}")
-        displacement = handle["timeseries"]
+        displacement = handle[self.timeseries_dataset]
         if displacement.ndim != 3:
             raise ValueError(
                 f"MintPy timeseries must be [time,row,column], got {displacement.shape}"
             )
         self.rows, self.columns = (int(value) for value in displacement.shape[1:])
-        dates = handle["date"]
+        dates = handle[self.date_dataset]
         if dates.ndim != 1 or len(dates) != displacement.shape[0]:
             raise ValueError("MintPy date and time dimensions are inconsistent")
         self.dates = tuple(_text(value) for value in dates[...])
@@ -190,7 +201,7 @@ class MintPyGridSource:
             raise IndexError(f"epoch_index out of range: {epoch}")
         start, stop = self._row_range(row_start, row_stop)
         return np.asarray(
-            self._require_timeseries()["timeseries"][epoch, start:stop, :],
+            self._require_timeseries()[self.timeseries_dataset][epoch, start:stop, :],
             dtype=np.float32,
         )
 

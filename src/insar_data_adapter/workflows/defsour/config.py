@@ -578,6 +578,11 @@ def load_mintpy_defsour_config(config_file: str | Path) -> MintPyDefsourConfig:
     native_only = _parse_bool(values.get("native_only", "false"), "native_only")
     if native_only and shared["write_tif"]:
         raise ValueError("native_only is incompatible with downsampled write_tif")
+    write_native = _parse_bool(
+        values.get("write_native_tif", "false"), "write_native_tif"
+    )
+    if native_only and not write_native:
+        raise ValueError("native_only requires write_native_tif = true")
     velocity = (
         _resolve_path(values["velocity_file"], path)
         if "velocity_file" in values
@@ -599,9 +604,7 @@ def load_mintpy_defsour_config(config_file: str | Path) -> MintPyDefsourConfig:
         height_dataset=values.get("height_dataset", "height"),
         mask_dataset=values.get("mask_dataset", "mask"),
         velocity_dataset=values.get("velocity_dataset", "velocity"),
-        write_native_tif=_parse_bool(
-            values.get("write_native_tif", "false"), "write_native_tif"
-        ),
+        write_native_tif=write_native,
         write_velocity_tif=write_velocity,
         write_dem_tif=_parse_bool(values.get("write_dem_tif", "false"), "write_dem_tif"),
         native_only=native_only,

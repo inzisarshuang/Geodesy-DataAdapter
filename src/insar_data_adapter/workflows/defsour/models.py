@@ -27,22 +27,27 @@ class DefsourEpochResult:
     """Describe the staged products for one output epoch."""
 
     date: str
-    defsour_path: Path
+    defsour_path: Path | None
     point_count: int
     geotiff_path: Path | None = None
 
     def __post_init__(self) -> None:
         if _DATE.fullmatch(self.date) is None:
             raise ValueError("Defsour epoch date must be YYYYMMDD")
-        object.__setattr__(
-            self, "defsour_path", _relative(self.defsour_path, "Defsour epoch path")
-        )
+        if self.defsour_path is not None:
+            object.__setattr__(
+                self,
+                "defsour_path",
+                _relative(self.defsour_path, "Defsour epoch path"),
+            )
         if self.geotiff_path is not None:
             object.__setattr__(
                 self,
                 "geotiff_path",
                 _relative(self.geotiff_path, "Defsour GeoTIFF path"),
             )
+        if self.defsour_path is None and self.geotiff_path is None:
+            raise ValueError("Defsour epoch requires a text or GeoTIFF product")
         if isinstance(self.point_count, bool) or self.point_count < 0:
             raise ValueError("Defsour epoch point_count must be non-negative")
 

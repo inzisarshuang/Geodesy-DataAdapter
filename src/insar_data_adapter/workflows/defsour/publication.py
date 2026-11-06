@@ -17,7 +17,8 @@ from .models import DefsourSnapshotMetadata
 def _required_products(metadata: DefsourSnapshotMetadata) -> tuple[Path, ...]:
     products: list[Path] = []
     for epoch in metadata.epochs:
-        products.append(epoch.defsour_path)
+        if epoch.defsour_path is not None:
+            products.append(epoch.defsour_path)
         if epoch.geotiff_path is not None:
             products.append(epoch.geotiff_path)
     products.extend(metadata.additional_products)
@@ -73,7 +74,11 @@ def _write_completion_files(
         "epochs": [
             {
                 "date": epoch.date,
-                "defsour_path": epoch.defsour_path.as_posix(),
+                "defsour_path": (
+                    None
+                    if epoch.defsour_path is None
+                    else epoch.defsour_path.as_posix()
+                ),
                 "point_count": epoch.point_count,
                 "geotiff_path": (
                     None
