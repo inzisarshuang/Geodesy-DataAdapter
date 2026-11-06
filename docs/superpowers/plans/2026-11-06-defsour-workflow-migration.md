@@ -318,11 +318,11 @@ git commit -m "feat: migrate LiCSBAS Defsour export"
 **Files:**
 - Modify: `src/insar_data_adapter/cli.py`
 - Modify: `src/insar_data_adapter/__init__.py`
-- Move: `config_examples/gamma_to_canonical.cfg` -> `config/canonical/gamma_to_canonical_h5.cfg`
-- Move: `config_examples/mintpy_to_canonical.cfg` -> `config/canonical/mintpy_to_canonical_h5.cfg`
-- Move: `config_examples/licsbas_to_canonical.cfg` -> `config/canonical/licsbas_to_canonical_h5.cfg`
-- Move: `config_examples/inspect.cfg` -> `config/canonical/inspect_h5.cfg`
-- Create: `config/data2defsour/{gamma_to_defsour,mintpy_to_defsour,licsbas_to_defsour}.cfg`
+- Move: `config_examples/gamma_to_canonical.cfg` -> `config/data2canonical/gamma2canonical_h5.cfg`
+- Move: `config_examples/mintpy_to_canonical.cfg` -> `config/data2canonical/mintpy2canonical_h5.cfg`
+- Move: `config_examples/licsbas_to_canonical.cfg` -> `config/data2canonical/licsbas2canonical_h5.cfg`
+- Move: `config_examples/inspect.cfg` -> `config/data2canonical/inspect_h5.cfg`
+- Create: `config/data2defsour/{gamma2defsour,mintpy2defsour,licsbas2defsour}.cfg`
 - Modify: `pyproject.toml`
 - Modify: `README.md`
 - Modify: `docs/architecture.md`
@@ -330,8 +330,8 @@ git commit -m "feat: migrate LiCSBAS Defsour export"
 - Modify: `docs/workflows_and_api.md`
 - Create: `tests/test_defsour_cli.py`
 - Modify: `tests/test_config.py`
-- Create: `../Gansu_Jishishan_LT1/config/canonical/gamma_to_canonical_h5.cfg`
-- Create: `../Gansu_Jishishan_LT1/config/data2defsour/gamma_to_defsour.cfg`
+- Create: `../Gansu_Jishishan_LT1/config/data2canonical/gamma2canonical_h5.cfg`
+- Create: `../Gansu_Jishishan_LT1/config/data2defsour/gamma2defsour.cfg`
 - Create: `../Gansu_Jishishan_LT1/config/data2defsour/REAL_DATA_TESTING.md`
 
 **Interfaces:**

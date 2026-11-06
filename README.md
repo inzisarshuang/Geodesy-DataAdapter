@@ -63,23 +63,23 @@ Core dependencies are declared in `pyproject.toml`. Optional readers may require
 Inspect a source product before conversion:
 
 ```bash
-insar-adapter inspect --config config/canonical/inspect_h5.cfg
-insar-adapter validate --config config/canonical/inspect_h5.cfg
+insar-adapter inspect --config config/data2canonical/inspect_h5.cfg
+insar-adapter validate --config config/data2canonical/inspect_h5.cfg
 ```
 
 Convert a GAMMA product with an explicit configuration:
 
 ```bash
 insar-adapter convert-gamma \
-  --config config/canonical/gamma_to_canonical_h5.cfg
+  --config config/data2canonical/gamma2canonical_h5.cfg
 ```
 
 Export a source product directly as one transactional Defsour snapshot:
 
 ```bash
-insar-adapter export-gamma-defsour --config config/data2defsour/gamma_to_defsour.cfg
-insar-adapter export-mintpy-defsour --config config/data2defsour/mintpy_to_defsour.cfg
-insar-adapter export-licsbas-defsour --config config/data2defsour/licsbas_to_defsour.cfg
+insar-adapter export-gamma-defsour --config config/data2defsour/gamma2defsour.cfg
+insar-adapter export-mintpy-defsour --config config/data2defsour/mintpy2defsour.cfg
+insar-adapter export-licsbas-defsour --config config/data2defsour/licsbas2defsour.cfg
 ```
 
 Use absolute paths in project CFG files when products are shared across repositories. Keep reusable defaults in the repository examples and project-specific paths in the project-level `config/` tree.

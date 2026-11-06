@@ -80,13 +80,13 @@ class DefsourCliTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         self.assertFalse((root / "config_examples").exists())
         expected = {
-            "config/canonical/gamma_to_canonical_h5.cfg",
-            "config/canonical/mintpy_to_canonical_h5.cfg",
-            "config/canonical/licsbas_to_canonical_h5.cfg",
-            "config/canonical/inspect_h5.cfg",
-            "config/data2defsour/gamma_to_defsour.cfg",
-            "config/data2defsour/mintpy_to_defsour.cfg",
-            "config/data2defsour/licsbas_to_defsour.cfg",
+            "config/data2canonical/gamma2canonical_h5.cfg",
+            "config/data2canonical/mintpy2canonical_h5.cfg",
+            "config/data2canonical/licsbas2canonical_h5.cfg",
+            "config/data2canonical/inspect_h5.cfg",
+            "config/data2defsour/gamma2defsour.cfg",
+            "config/data2defsour/mintpy2defsour.cfg",
+            "config/data2defsour/licsbas2defsour.cfg",
         }
         self.assertEqual(
             expected,

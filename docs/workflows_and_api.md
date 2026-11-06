@@ -46,8 +46,8 @@ python -m pip install -e .
 ## 3. Inspection / 检查
 
 ```bash
-insar-adapter inspect --config config/canonical/inspect_h5.cfg
-insar-adapter validate --config config/canonical/inspect_h5.cfg
+insar-adapter inspect --config config/data2canonical/inspect_h5.cfg
+insar-adapter validate --config config/data2canonical/inspect_h5.cfg
 ```
 
 Paths in cfg files are resolved relative to the cfg location. JSON output is suitable for logs and future workflow manifests.
@@ -67,7 +67,7 @@ The converter reads `/timeseries` by epoch and row block. It copies deformation 
 转换器按时期和行块读取 `/timeseries`，原样保留形变值与单位。DEM、静态有效掩膜、LOS 正负号、nodata 规则及高程单位都必须显式提供；缺失的几何信息绝不会用零 DEM 代替。
 
 ```bash
-insar-adapter convert-mintpy --config config/canonical/mintpy_to_canonical_h5.cfg
+insar-adapter convert-mintpy --config config/data2canonical/mintpy2canonical_h5.cfg
 ```
 
 ## 6. LiCSBAS Grid Conversion / LiCSBAS 规则栅格转换
@@ -77,7 +77,7 @@ LiCSBAS cumulative deformation, DEM, mask, pixel-centre coordinates, and spatial
 LiCSBAS 累积形变、DEM、mask、像元中心坐标和空间参考区从同一 HDF5 中按行块读取。由于许多 LiCSBAS 文件没有用 HDF5 属性声明科学约定，cfg 必须填写形变/高程单位、CRS、LOS 正号、nodata 规则、时间参考模式和像元注册方式。时间值既可原样保留并显式说明来源参考，也可通过减去 cfg 指定日期重新参考。
 
 ```bash
-insar-adapter convert-licsbas --config config/canonical/licsbas_to_canonical_h5.cfg
+insar-adapter convert-licsbas --config config/data2canonical/licsbas2canonical_h5.cfg
 ```
 
 ## 7. GAMMA Geocoded Grid Conversion / GAMMA 地理编码规则栅格转换
@@ -87,7 +87,7 @@ The first GAMMA adapter accepts a `tab` of headerless deformation files, a separ
 首版 GAMMA adapter 接受无文件头形变文件 `tab`、逐行日期清单、真实 DEM、显式 mask，以及包含规则经纬网格的 `.par`。每种 dtype 与字节序均显式填写；转换前检查所有二进制文件大小，数据通过 `memmap` 行切片读取。雷达坐标或曲线网格输入必须先完成地理编码。
 
 ```bash
-insar-adapter convert-gamma --config config/canonical/gamma_to_canonical_h5.cfg
+insar-adapter convert-gamma --config config/data2canonical/gamma2canonical_h5.cfg
 ```
 
 ## 8. Direct Source-to-Defsour / 来源直转 Defsour
@@ -96,9 +96,9 @@ Direct Defsour workflows use the source-specific CFGs under
 `config/data2defsour/`:
 
 ```bash
-insar-adapter export-gamma-defsour --config config/data2defsour/gamma_to_defsour.cfg
-insar-adapter export-mintpy-defsour --config config/data2defsour/mintpy_to_defsour.cfg
-insar-adapter export-licsbas-defsour --config config/data2defsour/licsbas_to_defsour.cfg
+insar-adapter export-gamma-defsour --config config/data2defsour/gamma2defsour.cfg
+insar-adapter export-mintpy-defsour --config config/data2defsour/mintpy2defsour.cfg
+insar-adapter export-licsbas-defsour --config config/data2defsour/licsbas2defsour.cfg
 ```
 
 All three commands select dates, apply the explicit temporal reference and
