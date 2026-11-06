@@ -17,6 +17,7 @@ from .defsour import (
     write_defsour_blocks,
     write_defsour_grid,
 )
+from .geotiff import write_geotiff
 
 
 __all__ = [
@@ -25,4 +26,5 @@ __all__ = [
     "infer_deformation_unit_label",
     "write_defsour_blocks",
     "write_defsour_grid",
+    "write_geotiff",
 ]
