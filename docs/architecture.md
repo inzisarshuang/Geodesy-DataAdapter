@@ -30,7 +30,7 @@ GAMMA / MintPy / PS-DS-InSAR
 - `sources/` modules own read-only MintPy, LiCSBAS, GAMMA, Defsour, headered point-table, and PS/DS access; bounded sources are implemented for the current grid formats and both point-table layouts.<br>`sources/` 模块分别负责只读 MintPy、LiCSBAS、GAMMA、Defsour、带表头点表和 PS/DS 访问；当前规则栅格格式及两种点表布局均已有受控分块来源。
 - `canonical.py` owns bounded-memory canonical grid reading and atomic writing; `points.py` provides the equivalent sparse-point contract.<br>`canonical.py` 负责受控内存的标准栅格读取和原子写入；`points.py` 提供对应的稀疏点数据契约。
 - `converters/` copies validated sources into the canonical schema; `exporters/` write atomic exchange files; `workflows/defsour/` composes source readers, transforms, and whole-directory publication.<br>`converters/` 将已校验来源复制到标准 schema；`exporters/` 原子写出交换文件；`workflows/defsour/` 组合来源读取、变换与整目录发布。
-- Plotting repositories consume the public API and must not duplicate source-format parsing.<br>绘图仓库只消费公共 API，不再重复解析源格式。
+- Visualization runs separately in `envPlot` and consumes plot-ready exchange files exported by this repository in `envInSAR`; it must not import this package or duplicate source-format parsing.<br>Visualization 在独立的 `envPlot` 中运行，只消费本仓库在 `envInSAR` 中导出的绘图交换文件；不导入本包，也不重复解析源格式。
 
 ## 3. Phases / 阶段
 
