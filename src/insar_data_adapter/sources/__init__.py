@@ -9,6 +9,7 @@ from .gamma_radar import (
     read_complex_binary_raster,
     read_gamma_par_value,
 )
+from .geotiff_series import GeoTIFFSeriesEpoch, read_geotiff_series_index
 from .licsbas import LiCSBASGridSource
 from .mintpy import MintPyGridSource
 from .text_points import HeaderedPointTableSource, PointValueBlock, PointValueMetadata
@@ -18,6 +19,7 @@ __all__ = [
     "DefsourPointBlock",
     "DefsourPointSource",
     "GammaGeoGridSource",
+    "GeoTIFFSeriesEpoch",
     "gamma_par_shape",
     "HeaderedPointTableSource",
     "LiCSBASGridSource",
@@ -28,4 +30,5 @@ __all__ = [
     "read_binary_raster",
     "read_complex_binary_raster",
     "read_gamma_par_value",
+    "read_geotiff_series_index",
 ]
