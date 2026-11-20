@@ -80,7 +80,17 @@ Export a source product directly as one transactional Defsour snapshot:
 insar-adapter export-gamma-defsour --config config/data2defsour/gamma2defsour.cfg
 insar-adapter export-mintpy-defsour --config config/data2defsour/mintpy2defsour.cfg
 insar-adapter export-licsbas-defsour --config config/data2defsour/licsbas2defsour.cfg
+insar-adapter export-geotiff-defsour --config config/data2defsour/geotiff2defsour.cfg
 ```
+
+The generic GeoTIFF workflow consumes one ordered two-column list per scalar
+series (`YYYYMMDDTHHMMSS path.tif`). It requires an explicit DEM and positive
+static mask, so a real zero remains valid even when a source TIFF declares
+zero as nodata.
+
+通用 GeoTIFF 工作流要求每个标量时序使用一个有序两列列表
+（`YYYYMMDDTHHMMSS path.tif`），并显式提供 DEM 与正值静态掩膜；因此即使
+源 TIFF 将零声明为 nodata，掩膜内的真实零值仍会保留。
 
 Use absolute paths in project CFG files when products are shared across repositories. Keep reusable defaults in the repository examples and project-specific paths in the project-level `config/` tree.
 

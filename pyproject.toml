@@ -25,6 +25,7 @@ where = ["src"]
 ]
 "share/insar-data-adapter/config/data2defsour" = [
   "config/data2defsour/gamma2defsour.cfg",
+  "config/data2defsour/geotiff2defsour.cfg",
   "config/data2defsour/licsbas2defsour.cfg",
   "config/data2defsour/mintpy2defsour.cfg",
 ]

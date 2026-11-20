@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tempfile
+import tomllib
 import unittest
 from contextlib import redirect_stdout
 from io import StringIO
@@ -25,6 +26,7 @@ class DefsourCliTests(unittest.TestCase):
                     Path("epochs/D20240101.txt"),
                     12,
                     Path("geotiff/D20240101.tif"),
+                    epoch_id=("20240101T123456" if source == "geotiff" else None),
                 ),
             ),
             metadata=DefsourExportMetadata(
@@ -50,13 +52,14 @@ class DefsourCliTests(unittest.TestCase):
             "export-gamma-defsour",
             "export-mintpy-defsour",
             "export-licsbas-defsour",
+            "export-geotiff-defsour",
         ):
             with self.subTest(command=command), self.assertRaises(SystemExit) as raised:
                 cli.main([command])
             self.assertNotEqual(raised.exception.code, 0)
 
     def test_each_command_loads_dispatches_and_prints_small_summary(self) -> None:
-        for source in ("gamma", "mintpy", "licsbas"):
+        for source in ("gamma", "mintpy", "licsbas", "geotiff"):
             command = f"export-{source}-defsour"
             config = type("Config", (), {"output_dir": Path("/tmp/export")})()
             output = StringIO()
@@ -71,6 +74,8 @@ class DefsourCliTests(unittest.TestCase):
             summary = output.getvalue()
             self.assertIn("OUTPUT: /tmp/export", summary)
             self.assertIn("DATES: 20240101", summary)
+            if source == "geotiff":
+                self.assertIn("EPOCH_IDS: 20240101T123456", summary)
             self.assertIn("POINT_COUNTS: 12", summary)
             self.assertIn("GEOTIFFS: 2", summary)
             self.assertIn("TEMPLATES: 1", summary)
@@ -87,6 +92,7 @@ class DefsourCliTests(unittest.TestCase):
             "config/data2defsour/gamma2defsour.cfg",
             "config/data2defsour/mintpy2defsour.cfg",
             "config/data2defsour/licsbas2defsour.cfg",
+            "config/data2defsour/geotiff2defsour.cfg",
         }
         self.assertEqual(
             expected,
@@ -95,6 +101,10 @@ class DefsourCliTests(unittest.TestCase):
                 for path in (root / "config").glob("*/*.cfg")
             },
         )
+        package_data = tomllib.loads((root / "pyproject.toml").read_text())[
+            "tool"
+        ]["setuptools"]["data-files"]["share/insar-data-adapter/config/data2defsour"]
+        self.assertIn("config/data2defsour/geotiff2defsour.cfg", package_data)
 
 
 if __name__ == "__main__":

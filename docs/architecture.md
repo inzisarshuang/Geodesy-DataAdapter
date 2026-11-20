@@ -27,7 +27,7 @@ GAMMA / MintPy / PS-DS-InSAR
 
 - `model.py` contains format-neutral summaries only.<br>`model.py` 只保存与来源无关的摘要模型。
 - `hdf5.py` detects and inspects HDF5 metadata without reading full arrays.<br>`hdf5.py` 识别并检查 HDF5 元数据，不读取完整数组。
-- `sources/` modules own read-only MintPy, LiCSBAS, GAMMA, Defsour, headered point-table, and PS/DS access; bounded sources are implemented for the current grid formats and both point-table layouts.<br>`sources/` 模块分别负责只读 MintPy、LiCSBAS、GAMMA、Defsour、带表头点表和 PS/DS 访问；当前规则栅格格式及两种点表布局均已有受控分块来源。
+- `sources/` modules own read-only MintPy, LiCSBAS, GAMMA, indexed GeoTIFF, Defsour, headered point-table, and PS/DS access; bounded sources are implemented for the current grid formats and both point-table layouts.<br>`sources/` 模块分别负责只读 MintPy、LiCSBAS、GAMMA、带索引 GeoTIFF、Defsour、带表头点表和 PS/DS 访问；当前规则栅格格式及两种点表布局均已有受控分块来源。
 - `canonical.py` owns bounded-memory canonical grid reading and atomic writing; `points.py` provides the equivalent sparse-point contract.<br>`canonical.py` 负责受控内存的标准栅格读取和原子写入；`points.py` 提供对应的稀疏点数据契约。
 - `converters/` copies validated sources into the canonical schema; `exporters/` write atomic exchange files; `workflows/defsour/` composes source readers, transforms, and whole-directory publication.<br>`converters/` 将已校验来源复制到标准 schema；`exporters/` 原子写出交换文件；`workflows/defsour/` 组合来源读取、变换与整目录发布。
 - Visualization runs separately in `envPlot` and consumes plot-ready exchange files exported by this repository in `envInSAR`; it must not import this package or duplicate source-format parsing.<br>Visualization 在独立的 `envPlot` 中运行，只消费本仓库在 `envInSAR` 中导出的绘图交换文件；不导入本包，也不重复解析源格式。
@@ -46,6 +46,7 @@ GAMMA / MintPy / PS-DS-InSAR
 10. Move reusable grid transforms in bounded phases (7B): preserve explicit Defsour validity-mask composition, valid-cell square-window mean/median behavior, and shared-mask DEM/deformation downsampling as source-neutral numerical APIs; keep CRS/profile changes and workflow factor selection separate.<br>分阶段迁移可复用网格变换（7B）：将显式 Defsour 有效掩膜组合、有效像元方形窗口均值/中位数行为以及高程/形变共用掩膜降采样保留为来源中立数值 API；CRS/profile 变化与工作流倍数选择仍保持独立。
 11. Move profile-aware raster transforms in bounded phases (7C): preserve static-grid and shared-mask DEM/deformation bilinear value reprojection plus nearest-neighbour validity reprojection behind explicit caller-supplied profiles; keep template persistence and workflow factor selection separate.<br>分阶段迁移 profile 驱动的栅格变换（7C）：在调用方显式提供 profile 的边界后，保留静态网格以及共用掩膜的 DEM/形变数值双线性重投影和有效掩膜最近邻重投影；模板持久化和工作流倍数选择继续保持独立。
 12. Publish direct GAMMA, MintPy, and LiCSBAS Defsour workflows (7D): keep source inputs read-only and epoch-bounded, make units/references/CRS explicit, and replace the complete export directory only after every required product validates.<br>发布 GAMMA、MintPy 和 LiCSBAS 直接 Defsour 工作流（7D）：来源只读且按时期分块，单位/参考/CRS 显式声明，仅在所有必需产品校验通过后替换整个导出目录。
+13. Publish a source-neutral indexed GeoTIFF Defsour workflow (7E): one two-column list identifies one scalar series; native rasters are read by windows, real zeros are governed by an explicit static mask, and exact timestamps survive publication.<br>发布来源中立的带索引 GeoTIFF Defsour 工作流（7E）：一个两列列表只标识一个标量时序；原生栅格按窗口读取，真实零值由显式静态掩膜控制，并在发布时保留完整时间戳。
 
 No phase should require a broad rewrite of an upstream processing repository.
 

@@ -99,9 +99,10 @@ Direct Defsour workflows use the source-specific CFGs under
 insar-adapter export-gamma-defsour --config config/data2defsour/gamma2defsour.cfg
 insar-adapter export-mintpy-defsour --config config/data2defsour/mintpy2defsour.cfg
 insar-adapter export-licsbas-defsour --config config/data2defsour/licsbas2defsour.cfg
+insar-adapter export-geotiff-defsour --config config/data2defsour/geotiff2defsour.cfg
 ```
 
-All three commands select dates, apply the explicit temporal reference and
+All four commands select epochs, apply the explicit temporal reference and
 scale, compose finite values with the configured mask, downsample/reproject,
 and publish `defsour_manifest.json` last. GAMMA also supports reusable aligned
 templates; MintPy can additionally publish native epoch, velocity, and DEM
@@ -109,9 +110,25 @@ GeoTIFFs. GAMMA requires an explicit source displacement unit, while MintPy
 velocity output requires explicit source units and matching HDF5 grid metadata.
 No command searches for sibling inputs implicitly.
 
-三个命令均按 CFG 选时期、时间参考与倍率，组合有限值和显式 mask，
+The GeoTIFF command is source-neutral. Its index contains exactly one scalar
+series and exactly two columns per non-comment row:
+
+```text
+YYYYMMDDTHHMMSS relative/or/absolute/epoch.tif
+```
+
+Relative TIFF paths resolve from the index directory. Units, CRS, scale,
+references, DEM, positive static mask, and zero/nodata semantics remain
+explicit in CFG; the command never parses a producer-specific combined list.
+
+四个命令均按 CFG 选时期、时间参考与倍率，组合有限值和显式 mask，
 再执行降采样/重投影，最后写入 `defsour_manifest.json`。GAMMA 可复用对齐
 模板；MintPy 还可导出原分辨率时期、速度和 DEM GeoTIFF。命令不会自动搜索同目录输入。
+
+GeoTIFF 命令与具体来源无关。它的索引只包含一个标量时序，每个非注释行严格为
+`YYYYMMDDTHHMMSS TIFF路径` 两列；相对路径从索引目录解析。单位、CRS、倍率、
+时空参考、DEM、正值静态掩膜以及零值/nodata 语义都必须在 CFG 中显式填写，
+命令不会解析任何生产软件专用的多分量组合列表。
 
 ## 9. Canonical Grid API / 标准栅格 API
 

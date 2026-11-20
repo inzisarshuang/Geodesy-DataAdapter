@@ -28,10 +28,12 @@ from .converters import convert_gamma_grid, convert_licsbas_grid, convert_mintpy
 from .hdf5 import inspect_hdf5
 from .workflows.defsour.config import (
     load_gamma_defsour_config,
+    load_geotiff_defsour_config,
     load_licsbas_defsour_config,
     load_mintpy_defsour_config,
 )
 from .workflows.defsour.gamma import export_gamma_defsour
+from .workflows.defsour.geotiff_series import export_geotiff_defsour
 from .workflows.defsour.licsbas import export_licsbas_defsour
 from .workflows.defsour.mintpy import export_mintpy_defsour
 
@@ -53,6 +55,7 @@ def build_parser() -> argparse.ArgumentParser:
         "export-gamma-defsour",
         "export-mintpy-defsour",
         "export-licsbas-defsour",
+        "export-geotiff-defsour",
     ):
         export = subparsers.add_parser(command)
         export.add_argument("--config", required=True)
@@ -61,6 +64,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _print_defsour_summary(output_dir, result) -> None:
     dates = ", ".join(epoch.date for epoch in result.epochs)
+    epoch_ids = ", ".join(epoch.epoch_id or epoch.date for epoch in result.epochs)
     counts = ", ".join(str(epoch.point_count) for epoch in result.epochs)
     geotiffs = sum(epoch.geotiff_path is not None for epoch in result.epochs)
     geotiffs += sum(
@@ -72,6 +76,7 @@ def _print_defsour_summary(output_dir, result) -> None:
     )
     print(f"OUTPUT: {output_dir}")
     print(f"DATES: {dates}")
+    print(f"EPOCH_IDS: {epoch_ids}")
     print(f"POINT_COUNTS: {counts}")
     print(f"GEOTIFFS: {geotiffs}")
     print(f"TEMPLATES: {templates}")
@@ -93,6 +98,10 @@ def main(argv=None) -> None:
         "export-licsbas-defsour": (
             load_licsbas_defsour_config,
             export_licsbas_defsour,
+        ),
+        "export-geotiff-defsour": (
+            load_geotiff_defsour_config,
+            export_geotiff_defsour,
         ),
     }
     if arguments.command in defsour_commands:
