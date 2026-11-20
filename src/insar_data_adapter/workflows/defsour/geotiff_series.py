@@ -11,13 +11,32 @@ import numpy as np
 import rasterio
 from pyproj import CRS
 from rasterio.enums import Resampling
+from rasterio.transform import array_bounds
 from rasterio.vrt import WarpedVRT
+from rasterio.warp import calculate_default_transform
 from rasterio.windows import Window
 
+from insar_data_adapter.exporters.defsour import (
+    DefsourExportMetadata,
+    write_defsour_grid,
+)
+from insar_data_adapter.exporters.geotiff import write_geotiff
 from insar_data_adapter.grid import aggregate_grid_array
 from insar_data_adapter.raster import reproject_downsampled_grid_to_profile
+from insar_data_adapter.sources.geotiff_series import (
+    GeoTIFFSeriesEpoch,
+    read_geotiff_series_index,
+)
 
-from .grid import GridProfile, PreparedDefsourGrid, coordinate_arrays
+from .config import GeoTIFFDefsourConfig
+from .grid import (
+    GridProfile,
+    PreparedDefsourGrid,
+    coordinate_arrays,
+    select_downsample_factor,
+)
+from .models import DefsourEpochResult, DefsourSnapshotMetadata
+from .publication import publish_defsour_snapshot, validate_output_separation
 
 
 @dataclass(frozen=True)
@@ -233,4 +252,197 @@ def _prepare_epoch_grid(
     )
 
 
-__all__ = []
+def _selected_epochs(
+    epochs: tuple[GeoTIFFSeriesEpoch, ...],
+    selected_ids: tuple[str, ...] | None,
+) -> tuple[GeoTIFFSeriesEpoch, ...]:
+    if selected_ids is None:
+        return epochs
+    by_id = {epoch.epoch_id: epoch for epoch in epochs}
+    missing = [epoch_id for epoch_id in selected_ids if epoch_id not in by_id]
+    if missing:
+        raise ValueError(f"selected GeoTIFF epochs are missing: {missing}")
+    return tuple(by_id[epoch_id] for epoch_id in selected_ids)
+
+
+def _output_profile(profile: GridProfile, output_crs: str) -> GridProfile:
+    target = CRS.from_user_input(output_crs)
+    if CRS.from_user_input(profile.crs) == target:
+        return profile
+    left, bottom, right, top = array_bounds(
+        profile.height, profile.width, profile.transform
+    )
+    transform, width, height = calculate_default_transform(
+        profile.crs,
+        target,
+        profile.width,
+        profile.height,
+        left,
+        bottom,
+        right,
+        top,
+    )
+    return GridProfile(height, width, target.to_string(), transform, "pixel_center")
+
+
+def _reference_epoch(
+    epochs: tuple[GeoTIFFSeriesEpoch, ...], temporal_reference: str
+) -> GeoTIFFSeriesEpoch | None:
+    if temporal_reference == "preserve":
+        return None
+    if temporal_reference == "first":
+        return epochs[0]
+    matches = tuple(epoch for epoch in epochs if epoch.date == temporal_reference)
+    if len(matches) != 1:
+        raise ValueError(
+            "temporal_reference date must identify exactly one selected GeoTIFF epoch"
+        )
+    return matches[0]
+
+
+def export_geotiff_defsour(
+    config: GeoTIFFDefsourConfig,
+) -> DefsourSnapshotMetadata:
+    """Export one indexed scalar GeoTIFF series as an atomic Defsour snapshot."""
+
+    if not isinstance(config, GeoTIFFDefsourConfig):
+        raise TypeError("config must be GeoTIFFDefsourConfig")
+    indexed = read_geotiff_series_index(config.index_file)
+    epochs = _selected_epochs(indexed, config.epoch_ids)
+    validate_output_separation(
+        config.output_dir,
+        (
+            config.config_path,
+            config.index_file,
+            config.height_file,
+            config.mask_file,
+            *(epoch.path for epoch in indexed),
+        ),
+    )
+    source_profile = _profile_from_raster(indexed[0].path, config.source_crs)
+    for epoch in indexed:
+        with rasterio.open(epoch.path) as dataset:
+            _validate_epoch_profile(dataset, source_profile)
+    static = _prepare_static_grid(
+        config.height_file,
+        config.mask_file,
+        source_profile,
+        chunk_rows=config.chunk_rows,
+        mask_mode=config.mask_mode,
+    )
+    factor = select_downsample_factor(
+        config.downsample_mode,
+        source_profile=source_profile,
+        valid_count=static.valid_count,
+        factor=config.factor,
+        target_points=config.target_points,
+        target_pixel_size=config.target_pixel_size,
+    )
+    if config.chunk_rows < factor:
+        raise ValueError("chunk_rows must be at least the selected downsample factor")
+    destination_profile = _output_profile(
+        source_profile.downsampled(factor), config.output_crs
+    )
+    reference_epoch = _reference_epoch(epochs, config.temporal_reference)
+    reference = (
+        None
+        if reference_epoch is None
+        else _prepare_epoch_grid(
+            reference_epoch.path,
+            static,
+            factor=factor,
+            aggregation=config.aggregation,
+            chunk_rows=config.chunk_rows,
+            destination_profile=destination_profile,
+        )
+    )
+    temporal_label = (
+        "preserve" if reference_epoch is None else reference_epoch.epoch_id
+    )
+    metadata = DefsourExportMetadata(
+        crs=config.output_crs,
+        deformation_unit=config.output_unit,
+        deformation_quantity=config.deformation_quantity,
+        height_unit=config.height_unit,
+        los_positive=config.los_positive,
+        nodata_policy=config.nodata_policy,
+        temporal_reference=temporal_label,
+        spatial_reference=config.spatial_reference,
+        source_provenance=config.source_provenance,
+    )
+
+    def build(staging: Path) -> DefsourSnapshotMetadata:
+        results: list[DefsourEpochResult] = []
+        for epoch in epochs:
+            prepared = _prepare_epoch_grid(
+                epoch.path,
+                static,
+                factor=factor,
+                aggregation=config.aggregation,
+                chunk_rows=config.chunk_rows,
+                destination_profile=destination_profile,
+            )
+            deformation = prepared.deformation.copy()
+            valid = prepared.valid.copy()
+            if reference is not None:
+                valid &= reference.valid & np.isfinite(reference.deformation)
+                deformation -= reference.deformation
+            deformation *= config.deformation_scale
+            relative = (
+                Path("epochs")
+                / f"{config.prefix}{epoch.epoch_id}{config.extension}"
+            )
+            exported = write_defsour_grid(
+                prepared.x,
+                prepared.y,
+                prepared.height,
+                deformation,
+                valid,
+                staging / relative,
+                metadata,
+                fmt=config.fmt,
+                block_rows=config.chunk_rows,
+                overwrite=False,
+            )
+            tif_relative = None
+            if config.write_tif:
+                tif_relative = (
+                    Path("geotiff") / f"{config.prefix}{epoch.epoch_id}.tif"
+                )
+                write_geotiff(
+                    staging / tif_relative,
+                    deformation,
+                    valid,
+                    prepared.profile,
+                    unit=config.output_unit,
+                    quantity=config.deformation_quantity,
+                )
+            results.append(
+                DefsourEpochResult(
+                    epoch.date,
+                    relative,
+                    exported.point_count,
+                    tif_relative,
+                    epoch_id=epoch.epoch_id,
+                )
+            )
+        return DefsourSnapshotMetadata(
+            source="geotiff",
+            epochs=tuple(results),
+            metadata=metadata,
+            transformations={
+                "aggregation": config.aggregation,
+                "deformation_scale": config.deformation_scale,
+                "downsample_factor": factor,
+                "mask_mode": config.mask_mode,
+                "source_crs": config.source_crs,
+                "source_unit": config.source_unit,
+            },
+        )
+
+    return publish_defsour_snapshot(
+        config.output_dir, build, overwrite=config.overwrite
+    )
+
+
+__all__ = ["export_geotiff_defsour"]
