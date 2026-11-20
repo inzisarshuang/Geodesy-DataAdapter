@@ -96,6 +96,7 @@ def _write_completion_files(
         "epochs": [
             {
                 "date": epoch.date,
+                "epoch_id": epoch.epoch_id,
                 "defsour_path": (
                     None
                     if epoch.defsour_path is None

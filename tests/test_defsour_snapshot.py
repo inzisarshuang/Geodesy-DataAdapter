@@ -51,11 +51,63 @@ class DefsourSnapshotTests(unittest.TestCase):
             manifest = json.loads((output / "defsour_manifest.json").read_text())
             self.assertEqual((manifest["schema_version"], manifest["status"]), (1, "complete"))
             self.assertEqual(manifest["dates"], ["20240101"])
+            self.assertIsNone(manifest["epochs"][0]["epoch_id"])
             self.assertEqual(manifest["point_counts"], [1])
             self.assertEqual(manifest["metadata"]["deformation_unit"], "m")
             self.assertIn("epochs/20240101.txt", manifest["required_products"])
             self.assertIn("geotiff/20240101.tif", manifest["required_products"])
             self.assertTrue((output / "README_DEFSOUR.txt").is_file())
+
+    def test_exact_epoch_identity_is_validated_and_controls_uniqueness(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            staging = Path(directory)
+            template = self._metadata(staging)
+            first = DefsourEpochResult(
+                "20240101",
+                Path("epochs/first.txt"),
+                1,
+                epoch_id="20240101T123456",
+            )
+            second = DefsourEpochResult(
+                "20240101",
+                Path("epochs/second.txt"),
+                1,
+                epoch_id="20240101T234501",
+            )
+            snapshot = DefsourSnapshotMetadata(
+                source=template.source,
+                epochs=(first, second),
+                metadata=template.metadata,
+                transformations=template.transformations,
+            )
+            self.assertEqual(
+                tuple(epoch.epoch_id for epoch in snapshot.epochs),
+                ("20240101T123456", "20240101T234501"),
+            )
+
+            with self.assertRaisesRegex(ValueError, "duplicate"):
+                DefsourSnapshotMetadata(
+                    source=template.source,
+                    epochs=(first, first),
+                    metadata=template.metadata,
+                    transformations=template.transformations,
+                )
+
+        for invalid in (
+            "20240101",
+            "20240101T12345",
+            "20240230T120000",
+            "20240101T246000",
+        ):
+            with self.subTest(epoch_id=invalid), self.assertRaisesRegex(
+                ValueError, "epoch_id"
+            ):
+                DefsourEpochResult(
+                    "20240101",
+                    Path("epochs/invalid.txt"),
+                    1,
+                    epoch_id=invalid,
+                )
 
     def test_complete_snapshot_is_replaced_but_overwrite_false_stops_before_build(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
