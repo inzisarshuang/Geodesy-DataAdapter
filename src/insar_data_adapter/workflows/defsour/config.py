@@ -24,6 +24,7 @@ from insar_data_adapter.config import (
 from insar_data_adapter.project_layout import AdapterProjectLayout
 
 _DATE = re.compile(r"\d{8}\Z")
+_EPOCH_ID = re.compile(r"\d{8}T\d{6}\Z")
 _BYTE_ORDERS = {"big", "little", "native"}
 _SHARED_KEYS = {
     "output_dir",
@@ -107,6 +108,14 @@ _LICSBAS_KEYS = _SHARED_KEYS | {
     "height_dataset",
     "mask_dataset",
     "refarea_dataset",
+}
+_GEOTIFF_KEYS = (_SHARED_KEYS - {"dates"}) | {
+    "epochs",
+    "index_file",
+    "height_file",
+    "mask_file",
+    "source_unit",
+    "mask_mode",
 }
 
 
@@ -200,6 +209,16 @@ class LiCSBASDefsourConfig(DefsourWorkflowConfig):
     refarea_dataset: str
 
 
+@dataclass(frozen=True)
+class GeoTIFFDefsourConfig(DefsourWorkflowConfig):
+    epoch_ids: tuple[str, ...] | None
+    index_file: Path
+    height_file: Path
+    mask_file: Path
+    source_unit: str
+    mask_mode: str
+
+
 def _required(values: dict[str, str], keys: set[str], source: str) -> None:
     missing = sorted(keys.difference(values))
     if missing:
@@ -226,6 +245,24 @@ def _dates(value: str) -> tuple[str, ...] | None:
             raise ValueError(f"dates contains an invalid calendar date: {item}") from error
     if len(set(items)) != len(items):
         raise ValueError("dates contains duplicate values")
+    return items
+
+
+def _epoch_ids(value: str) -> tuple[str, ...] | None:
+    if value.strip().lower() == "all":
+        return None
+    items = tuple(item.strip() for item in value.split(","))
+    if not items or any(_EPOCH_ID.fullmatch(item) is None for item in items):
+        raise ValueError(
+            "epochs must be all or comma-separated YYYYMMDDTHHMMSS values"
+        )
+    for item in items:
+        try:
+            datetime.strptime(item, "%Y%m%dT%H%M%S")
+        except ValueError as error:
+            raise ValueError(f"epochs contains an invalid date or time: {item}") from error
+    if len(set(items)) != len(items):
+        raise ValueError("epochs contains duplicate values")
     return items
 
 
@@ -779,12 +816,55 @@ def load_licsbas_defsour_config(config_file: str | Path) -> LiCSBASDefsourConfig
     )
 
 
+def load_geotiff_defsour_config(config_file: str | Path) -> GeoTIFFDefsourConfig:
+    path = Path(config_file).expanduser().resolve(strict=True)
+    values = _read_strict_config(path, _GEOTIFF_KEYS)
+    _required(
+        values,
+        {
+            "epochs",
+            "index_file",
+            "height_file",
+            "mask_file",
+            "source_unit",
+            "mask_mode",
+        },
+        "GeoTIFF",
+    )
+    source_unit = _text(values, "source_unit")
+    _normalized_length_unit(source_unit)
+    shared_values = dict(values)
+    shared_values["dates"] = "all"
+    shared = _shared(shared_values, path, "geotiff", source_unit=source_unit)
+    mask_mode = values["mask_mode"].strip().lower()
+    if mask_mode != "positive":
+        raise ValueError("mask_mode must be positive")
+    inputs = {
+        key: _resolve_path(values[key], path)
+        for key in ("index_file", "height_file", "mask_file")
+    }
+    for key, input_path in inputs.items():
+        if not input_path.is_file():
+            raise FileNotFoundError(f"GeoTIFF Defsour {key} not found: {input_path}")
+    return GeoTIFFDefsourConfig(
+        **shared,
+        epoch_ids=_epoch_ids(values["epochs"]),
+        index_file=inputs["index_file"],
+        height_file=inputs["height_file"],
+        mask_file=inputs["mask_file"],
+        source_unit=source_unit,
+        mask_mode=mask_mode,
+    )
+
+
 __all__ = [
     "DefsourWorkflowConfig",
     "GammaDefsourConfig",
+    "GeoTIFFDefsourConfig",
     "LiCSBASDefsourConfig",
     "MintPyDefsourConfig",
     "load_gamma_defsour_config",
+    "load_geotiff_defsour_config",
     "load_licsbas_defsour_config",
     "load_mintpy_defsour_config",
 ]
