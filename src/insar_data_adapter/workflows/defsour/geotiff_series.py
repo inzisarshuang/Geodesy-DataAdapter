@@ -48,13 +48,25 @@ class _StaticGrid:
     mask_mode: str
 
 
+def _validate_scalar_geotiff(dataset: rasterio.io.DatasetReader) -> None:
+    """Require the unambiguous pixel-area scalar GeoTIFF contract."""
+
+    if dataset.driver != "GTiff":
+        raise ValueError("GeoTIFF series inputs must use the GeoTIFF driver")
+    if dataset.count != 1:
+        raise ValueError("GeoTIFF series deformation raster must be single-band")
+    if np.dtype(dataset.dtypes[0]).kind not in {"f", "i", "u"}:
+        raise ValueError("GeoTIFF series deformation raster must contain real scalar values")
+    if dataset.tags().get("AREA_OR_POINT", "Area").strip().lower() == "point":
+        raise ValueError("GeoTIFF series deformation raster must use pixel-area registration")
+
+
 def _profile_from_raster(path: str | Path, configured_crs: str) -> GridProfile:
     """Read and validate the reference profile from one deformation raster."""
 
     source_path = Path(path).expanduser().resolve()
     with rasterio.open(source_path) as dataset:
-        if dataset.count != 1:
-            raise ValueError("GeoTIFF series deformation raster must be single-band")
+        _validate_scalar_geotiff(dataset)
         if dataset.crs is None:
             raise ValueError("GeoTIFF series deformation raster requires a declared CRS")
         expected = CRS.from_user_input(configured_crs)
@@ -104,6 +116,9 @@ def _aligned_vrts(
         raise ValueError("GeoTIFF Defsour DEM and mask must be single-band")
     if height_source.crs is None or mask_source.crs is None:
         raise ValueError("GeoTIFF Defsour DEM and mask require declared CRS values")
+    height_nodata = height_source.nodata
+    if height_nodata is None and np.dtype(height_source.dtypes[0]).kind == "f":
+        height_nodata = np.nan
     height = stack.enter_context(
         WarpedVRT(
             height_source,
@@ -111,7 +126,7 @@ def _aligned_vrts(
             transform=profile.transform,
             width=profile.width,
             height=profile.height,
-            src_nodata=height_source.nodata,
+            src_nodata=height_nodata,
             nodata=np.nan,
             resampling=Resampling.bilinear,
         )
@@ -169,15 +184,22 @@ def _prepare_static_grid(
 
 
 def _validate_epoch_profile(dataset: rasterio.io.DatasetReader, profile: GridProfile) -> None:
-    if dataset.count != 1:
-        raise ValueError("GeoTIFF series deformation raster must be single-band")
+    _validate_scalar_geotiff(dataset)
     if dataset.crs is None or CRS.from_user_input(dataset.crs) != CRS.from_user_input(
         profile.crs
     ):
         raise ValueError("GeoTIFF series deformation raster CRS mismatch")
     if (dataset.height, dataset.width) != (profile.height, profile.width):
         raise ValueError("GeoTIFF series deformation raster shape mismatch")
-    if not np.allclose(tuple(dataset.transform)[:6], tuple(profile.transform)[:6]):
+    transform_tolerance = max(
+        abs(float(profile.transform.a)), abs(float(profile.transform.e))
+    ) * 1e-9
+    if not np.allclose(
+        tuple(dataset.transform)[:6],
+        tuple(profile.transform)[:6],
+        rtol=0.0,
+        atol=transform_tolerance,
+    ):
         raise ValueError("GeoTIFF series deformation raster transform mismatch")
 
 
@@ -219,6 +241,13 @@ def _prepare_epoch_grid(
                 & np.isfinite(height_values)
                 & np.isfinite(deformation_values)
             )
+            deformation_nodata = deformation.nodata
+            if (
+                deformation_nodata is not None
+                and np.isfinite(deformation_nodata)
+                and deformation_nodata != 0.0
+            ):
+                valid &= deformation_values != deformation_nodata
             output_start = int(window.row_off) // factor
             output_stop = output_start + int(window.height) // factor
             height_out[output_start:output_stop] = aggregate_grid_array(
@@ -262,7 +291,8 @@ def _selected_epochs(
     missing = [epoch_id for epoch_id in selected_ids if epoch_id not in by_id]
     if missing:
         raise ValueError(f"selected GeoTIFF epochs are missing: {missing}")
-    return tuple(by_id[epoch_id] for epoch_id in selected_ids)
+    selected = set(selected_ids)
+    return tuple(epoch for epoch in epochs if epoch.epoch_id in selected)
 
 
 def _output_profile(profile: GridProfile, output_crs: str) -> GridProfile:
@@ -283,21 +313,6 @@ def _output_profile(profile: GridProfile, output_crs: str) -> GridProfile:
         top,
     )
     return GridProfile(height, width, target.to_string(), transform, "pixel_center")
-
-
-def _reference_epoch(
-    epochs: tuple[GeoTIFFSeriesEpoch, ...], temporal_reference: str
-) -> GeoTIFFSeriesEpoch | None:
-    if temporal_reference == "preserve":
-        return None
-    if temporal_reference == "first":
-        return epochs[0]
-    matches = tuple(epoch for epoch in epochs if epoch.date == temporal_reference)
-    if len(matches) != 1:
-        raise ValueError(
-            "temporal_reference date must identify exactly one selected GeoTIFF epoch"
-        )
-    return matches[0]
 
 
 def export_geotiff_defsour(
@@ -343,22 +358,6 @@ def export_geotiff_defsour(
     destination_profile = _output_profile(
         source_profile.downsampled(factor), config.output_crs
     )
-    reference_epoch = _reference_epoch(epochs, config.temporal_reference)
-    reference = (
-        None
-        if reference_epoch is None
-        else _prepare_epoch_grid(
-            reference_epoch.path,
-            static,
-            factor=factor,
-            aggregation=config.aggregation,
-            chunk_rows=config.chunk_rows,
-            destination_profile=destination_profile,
-        )
-    )
-    temporal_label = (
-        "preserve" if reference_epoch is None else reference_epoch.epoch_id
-    )
     metadata = DefsourExportMetadata(
         crs=config.output_crs,
         deformation_unit=config.output_unit,
@@ -366,7 +365,7 @@ def export_geotiff_defsour(
         height_unit=config.height_unit,
         los_positive=config.los_positive,
         nodata_policy=config.nodata_policy,
-        temporal_reference=temporal_label,
+        temporal_reference="preserve",
         spatial_reference=config.spatial_reference,
         source_provenance=config.source_provenance,
     )
@@ -384,9 +383,6 @@ def export_geotiff_defsour(
             )
             deformation = prepared.deformation.copy()
             valid = prepared.valid.copy()
-            if reference is not None:
-                valid &= reference.valid & np.isfinite(reference.deformation)
-                deformation -= reference.deformation
             deformation *= config.deformation_scale
             relative = (
                 Path("epochs")

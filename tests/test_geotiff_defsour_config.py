@@ -104,6 +104,21 @@ class GeoTIFFDefsourConfigTests(unittest.TestCase):
             ("mask_mode = positive", "mask_mode = nonzero", "mask_mode"),
             ("output_unit = mm", "output_unit = m", "output_unit"),
             ("epochs = all", "epochs = 20240230T120000", "epochs"),
+            (
+                "los_positive = source_values_preserved_direction_unknown",
+                "los_positive = toward_satellite",
+                "los_positive",
+            ),
+            (
+                "deformation_quantity = cumulative_displacement",
+                "deformation_quantity = velocity",
+                "deformation_quantity",
+            ),
+            (
+                "temporal_reference = preserve",
+                "temporal_reference = first",
+                "temporal_reference",
+            ),
         )
         for old, new, message in replacements:
             with self.subTest(message=message), tempfile.TemporaryDirectory() as directory:

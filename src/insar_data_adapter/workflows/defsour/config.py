@@ -290,7 +290,12 @@ def _format(value: str) -> str:
 
 def _output(values: dict[str, str], path: Path, source: str) -> Path:
     if "output_dir" in values:
-        return _resolve_path(values["output_dir"], path)
+        candidate = Path(values["output_dir"]).expanduser()
+        if not candidate.is_absolute():
+            candidate = path.parent / candidate
+        # Resolve the parent for a stable absolute path, but deliberately preserve
+        # the leaf so the transactional publisher can detect and reject a symlink.
+        return candidate.parent.resolve() / candidate.name
     required = {"project_root", "project", "processing_root"}
     missing = sorted(required.difference(values))
     if missing:
@@ -836,6 +841,17 @@ def load_geotiff_defsour_config(config_file: str | Path) -> GeoTIFFDefsourConfig
     shared_values = dict(values)
     shared_values["dates"] = "all"
     shared = _shared(shared_values, path, "geotiff", source_unit=source_unit)
+    if shared["deformation_quantity"] != "cumulative_displacement":
+        raise ValueError(
+            "GeoTIFF deformation_quantity must be cumulative_displacement"
+        )
+    if shared["los_positive"] != "source_values_preserved_direction_unknown":
+        raise ValueError(
+            "GeoTIFF los_positive must be "
+            "source_values_preserved_direction_unknown"
+        )
+    if shared["temporal_reference"] != "preserve":
+        raise ValueError("GeoTIFF temporal_reference must be preserve")
     mask_mode = values["mask_mode"].strip().lower()
     if mask_mode != "positive":
         raise ValueError("mask_mode must be positive")

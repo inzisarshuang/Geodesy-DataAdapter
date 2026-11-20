@@ -120,7 +120,7 @@ mask_mode = positive
         self.assertEqual(manifest["transformations"]["downsample_factor"], 3)
         self.assertEqual(manifest["transformations"]["source_unit"], "m")
 
-    def test_selected_epochs_preserve_requested_index_order(self) -> None:
+    def test_selected_epochs_preserve_authoritative_index_order(self) -> None:
         config_path = self.config(write_tif=False)
         config_path.write_text(
             config_path.read_text().replace(
@@ -134,12 +134,12 @@ mask_mode = positive
 
         self.assertEqual(
             tuple(epoch.epoch_id for epoch in result.epochs),
-            ("20240113T234501", "20240101T123456"),
+            ("20240101T123456", "20240113T234501"),
         )
         self.assertTrue(all(epoch.geotiff_path is None for epoch in result.epochs))
 
     def test_late_raster_failures_preserve_existing_snapshot(self) -> None:
-        cases = ("shape", "transform", "crs", "unreadable")
+        cases = ("shape", "transform", "crs", "complex", "unreadable")
         for mode in cases:
             with self.subTest(mode=mode):
                 config = load_geotiff_defsour_config(self.config())
@@ -152,18 +152,52 @@ mask_mode = positive
                 else:
                     values = np.ones((5, 6) if mode == "shape" else (6, 6))
                     transform = (
-                        from_origin(-156.0, 20.0, 0.002, 0.001)
+                        from_origin(-155.999, 20.0, 0.001, 0.001)
                         if mode == "transform"
                         else self.transform
                     )
                     crs = "EPSG:3857" if mode == "crs" else "EPSG:4326"
-                    self.write_raster(second, values, transform=transform, crs=crs)
+                    if mode == "complex":
+                        data = np.ones((6, 6), dtype=np.complex64) * (1 + 10j)
+                        with rasterio.open(
+                            second,
+                            "w",
+                            driver="GTiff",
+                            height=6,
+                            width=6,
+                            count=1,
+                            dtype="complex64",
+                            crs=crs,
+                            transform=transform,
+                        ) as dataset:
+                            dataset.write(data, 1)
+                    else:
+                        self.write_raster(second, values, transform=transform, crs=crs)
 
                 with self.assertRaises(Exception):
                     export_geotiff_defsour(config)
 
                 self.assertEqual(old.read_text(), "old")
                 self.assertEqual({path.name for path in config.output_dir.iterdir()}, {"old.txt"})
+
+    def test_output_symlink_is_rejected_without_touching_target(self) -> None:
+        config_path = self.config()
+        target = self.root / "protected"
+        target.mkdir()
+        sentinel = target / "sentinel.txt"
+        sentinel.write_text("keep", encoding="utf-8")
+        link = self.root / "output_link"
+        link.symlink_to(target, target_is_directory=True)
+        config_path.write_text(
+            config_path.read_text().replace("output_dir = output", "output_dir = output_link")
+        )
+        config = load_geotiff_defsour_config(config_path)
+
+        with self.assertRaisesRegex(ValueError, "symlink"):
+            export_geotiff_defsour(config)
+
+        self.assertEqual(sentinel.read_text(), "keep")
+        self.assertTrue(link.is_symlink())
 
 
 if __name__ == "__main__":
