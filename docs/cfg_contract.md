@@ -133,15 +133,17 @@ PSI_WWQ/PSI_ZDN 的来源契约，所以本阶段不增加 cfg 参数。第四�
 
 ## 7. Direct Defsour Workflow Keys / 直接 Defsour 工作流参数
 
-All three source workflows require an explicit `output_dir` (or complete
-method-root context), `dates`, source/output CRS, deformation scale and matching
+The four source workflows require an explicit `output_dir` (or complete
+method-root context), epoch selection, source/output CRS, deformation scale and matching
 output unit, deformation quantity, height unit, LOS convention, nodata policy,
-temporal/spatial reference, provenance, one downsample mode, aggregation,
-`chunk_rows`, `write_tif`, and `overwrite`.
+temporal/spatial reference, provenance, and one downsample mode. Optional
+controls include `aggregation` (default `mean`), `chunk_rows` (default 128),
+`write_tif` (default `false`), and `overwrite` (default `true`).
 
-三种来源均必须显式填写输出目录（或完整 method-root 上下文）、时期、
+四种来源均必须显式填写输出目录（或完整 method-root 上下文）、时期、
 源/目标 CRS、倍率与对应输出单位、物理量、高程单位、LOS 符号、nodata、
-时空参考、来源、降采样方式、聚合、行块大小和覆盖策略。
+时空参考、来源及降采样方式。聚合方式、行块大小、是否写出 GeoTIFF 和是否覆盖
+均可选，默认分别为 `mean`、128、`false` 和 `true`。
 
 - GAMMA additionally requires tab/date/parameter/DEM/mask paths and explicit
   binary dtype/byte order plus `source_unit`. Radar grids add paired
@@ -154,10 +156,18 @@ temporal/spatial reference, provenance, one downsample mode, aggregation,
   `velocity_source_unit` and matching unit/grid metadata in the velocity HDF5.
 - LiCSBAS requires the input HDF5, dataset names including `refarea_dataset`,
   and `source_unit`. A declared source unit/CRS must agree with CFG.
+- Indexed GeoTIFF uses `epochs = all` or comma-separated `YYYYMMDDTHHMMSS`
+  identifiers in place of `dates`. Give each scalar series a separate two-column
+  `index_file` and output directory. Supply `height_file`, `mask_file`,
+  `mask_mode = positive` and `source_unit`. Indexed TIFF paths are resolved
+  from the index directory, and selected epochs retain index order.<br>
+  带索引 GeoTIFF 使用 `epochs = all` 或逗号分隔的完整时间戳代替 `dates`。
+  每个标量时序用独立的两列索引和输出目录。填写 DEM、掩膜、`mask_mode = positive`
+  和源单位。索引中的 TIFF 相对路径按索引目录解析，选中时期沿用索引顺序。
 
-Every relative path resolves from its CFG. The output directory is staged as a
+Relative paths written in the CFG resolve from its directory. The output directory is staged as a
 sibling and replaced only after every declared product, README, and manifest
 validates. See `config/data2defsour/` for complete bilingual templates.
 
-所有相对路径以 CFG 所在目录为基准。输出先在同级临时目录完整生成和校验，
+CFG 中填写的相对路径以 CFG 所在目录为基准。输出先在同级临时目录完整生成和校验，
 然后才替换旧目录。完整中英文模板位于 `config/data2defsour/`。

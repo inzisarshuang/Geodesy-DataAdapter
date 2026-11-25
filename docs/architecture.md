@@ -15,12 +15,14 @@ GAMMA / MintPy / PS-DS-InSAR
               ▼
       canonical data API
               │
-       ┌──────┼────────┐
-       ▼      ▼        ▼
-     HDF5   GRD/TIF  Defsour
-       │
-       ▼
- PyGMT / Matplotlib / analysis
+       ┌──────┴────────┐
+       ▼               ▼
+  HDF5 for analysis   explicit exchange export
+                       │
+                 GRD/TIF/Defsour
+                       │
+                       ▼
+              PyGMT / Matplotlib
 ```
 
 ## 2. Component Rules / 组件规则
@@ -38,7 +40,7 @@ GAMMA / MintPy / PS-DS-InSAR
 2. Implement canonical grid HDF5 readers/writers with atomic, chunked output (complete).<br>实现标准规则栅格 HDF5 读写和原子分块输出（已完成）。
 3. Implement source adapters in bounded subphases: MintPy grid (3A complete), LiCSBAS grid (3B complete), and geocoded GAMMA memmap (3C complete).<br>按受控子阶段实现来源适配：MintPy 规则栅格（3A 已完成）、LiCSBAS 规则栅格（3B 已完成）及地理编码 GAMMA memmap（3C 已完成）。
 4. Implement PS/DS support in bounded subphases: canonical point HDF5 I/O (4A complete), then source-specific PSI_WWQ/PSI_ZDN adapters (4B).<br>按受控子阶段实现 PS/DS：标准点 HDF5 读写（4A 已完成），再实现 PSI_WWQ/PSI_ZDN 来源 adapter（4B）。
-5. Integrate PyGMT in bounded subphases: expose consumer-safe grid axes and registration (5A complete), then connect and verify `scatter`, `grid`, and `auto` render modes (5B).<br>分阶段接入 PyGMT：先提供消费端安全使用的网格轴与注册方式（5A 已完成），再接入并验证 `scatter`、`grid` 和 `auto` 绘图模式（5B）。
+5. Expose consumer-safe grid axes and registration metadata for analysis and export workflows (complete); plotting backends remain owned by Geodesy-Visualization.<br>为分析与导出工作流提供可安全使用的网格轴和注册元数据（已完成）；绘图后端继续由 Geodesy-Visualization 负责。
 6. Separate legacy source preparation in bounded subphases: formalize Defsour point parsing and CRS conversion in the adapter (6A source contract complete), then let Visualization retain only temporary GMT gridding and verify it against real-data baselines.<br>分阶段拆分旧来源准备逻辑：先在 Adapter 中规范 Defsour 点表解析与 CRS 转换（6A 来源契约已完成），再让 Visualization 仅保留 GMT 临时网格化，并用真实数据基线验收。
 7. Formalize named, headered point-value ingestion before replacing Visualization's legacy TXT parsing (6B source contract). Preserve descriptive value headers while keeping scientific metadata independently explicit.<br>在替换 Visualization 的旧 TXT 解析前，先规范具名、带表头的点值读取（6B 来源契约）；保留描述性数值字段名，同时独立显式记录科学元数据。
 8. Separate GeoTIFF adaptation from GMT rendering (6C): Adapter owns explicit CRS, resampling, nodata, scaling, provenance, and atomic GeoTIFF output; Visualization may consume that output for temporary GRD preparation.<br>将 GeoTIFF 适配与 GMT 渲染拆分（6C）：Adapter 负责显式 CRS、重采样、nodata、缩放、来源及原子 GeoTIFF 输出；Visualization 可消费该输出准备临时 GRD。

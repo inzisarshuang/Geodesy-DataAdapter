@@ -15,7 +15,7 @@ This repository does not perform InSAR preprocessing, interferometric analysis, 
 ```text
 Geodesy-DataAdapter/
 ├── config/                   # Canonical and data2defsour CFGs / 标准化与 Defsour 配置
-│   ├── canonical/
+│   ├── data2canonical/
 │   └── data2defsour/
 ├── docs/                     # Contracts, architecture, and detailed workflows / 契约、架构与详细流程
 ├── src/insar_data_adapter/   # Python package / Python 包
@@ -38,25 +38,27 @@ Upstream product
     -> select a bounded format reader
     -> normalize coordinates, units, masks, and provenance
     -> write a canonical grid or point table
-    -> hand the canonical product to analysis or visualization
+    -> hand canonical HDF5 to analysis, or export plot-ready exchange files
 ```
 
 The repository currently supports bounded adapters for GAMMA, MintPy, LiCSBAS, GeoTIFF, Defsour-style point sources, and documented text point tables. Exact commands, format assumptions, canonical APIs, and export options are maintained in the [workflow and API reference](docs/workflows_and_api.md).
 
-当前仓库为 GAMMA、MintPy、LiCSBAS、GeoTIFF、Defsour 点源和已定义格式的文本点表提供受控适配器。具体命令、格式假设、标准接口和导出方式见[流程与 API 参考](docs/workflows_and_api.md)。
+当前仓库为 GAMMA、MintPy、LiCSBAS、GeoTIFF、Defsour 点源和已定义格式的文本点表提供受控适配器。标准 HDF5 供 `envInSAR` 中的分析消费者使用；`Geodesy-Visualization` 只读取显式导出的 GeoTIFF、GRD 或标准表格，不直接依赖本包。具体命令、格式假设、标准接口和导出方式见[流程与 API 参考](docs/workflows_and_api.md)。
 
 ## 4. Dependencies And Installation / 环境与安装
 
-Use the shared `envInSAR` environment for project work:
+From this repository root, use the shared `envInSAR` environment.
+
+在本仓库根目录使用共用的 `envInSAR` 环境。
 
 ```bash
 conda activate envInSAR
-python -m pip install -e /mnt/beegfs/procesados/yiluntan/Geodesy-DataAdapter
+python -m pip install -e .
 ```
 
 Core dependencies are declared in `pyproject.toml`. Optional readers may require the Python packages associated with their source format.
 
-项目工作统一使用 `envInSAR`。核心依赖声明在 `pyproject.toml` 中；部分可选读取器还需要相应源格式的 Python 依赖。
+核心依赖声明在 `pyproject.toml` 中。部分可选读取器还需要相应源格式的 Python 依赖。
 
 ## 5. Quick Start / 快速开始
 

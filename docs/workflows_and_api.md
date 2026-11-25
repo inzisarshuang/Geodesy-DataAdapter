@@ -18,9 +18,9 @@ This document is the detailed workflow and API reference for `Geodesy-DataAdapte
 - Reproject and scale single-band GeoTIFFs with explicit metadata, nodata, resampling, and atomic output.<br>使用显式元数据、nodata、重采样和原子输出重投影及缩放单波段 GeoTIFF。
 - Export GAMMA, MintPy, and LiCSBAS grids directly to transactional Defsour snapshots without materializing a time cube.<br>不实例化整个时间立方体，直接将 GAMMA、MintPy 和 LiCSBAS 网格导出为事务式 Defsour 快照。
 
-Source-specific PS/DS ingestion, GRD export, canonical-to-GeoTIFF export, and direct PyGMT rendering remain deferred. GAMMA Defsour export now accepts both regular geocoded grids and explicit radar-grid longitude/latitude rasters.
+Source-specific PS/DS ingestion, GRD export, and canonical-to-GeoTIFF exchange export remain deferred. Direct PyGMT rendering is intentionally outside this repository. GAMMA Defsour export now accepts both regular geocoded grids and explicit radar-grid longitude/latitude rasters.
 
-特定来源的 PS/DS 接入、GRD 导出、标准产品到 GeoTIFF 导出及直接 PyGMT 渲染仍留到后续阶段。GAMMA Defsour 导出已同时支持规则地理编码网格和显式经纬度雷达网格。
+特定来源的 PS/DS 接入、GRD 导出和标准产品到 GeoTIFF 交换文件导出仍留到后续阶段。直接 PyGMT 渲染明确不属于本仓库。GAMMA Defsour 导出已同时支持规则地理编码网格和显式经纬度雷达网格。
 
 Adapter 0.20 exposes strict read-only GAMMA radar primitives for parameter
 shapes, explicit real/complex binary rasters, and geographic-lookup sampling.
@@ -166,13 +166,14 @@ The example uses complete arrays only for readability. Production source adapter
 Readers expose dates and dimensions through `reader.summary`, complete validated
 scientific metadata through `reader.metadata`, X/Y coordinates through
 `read_axis`, grid registration through `grid_registration`, and values through
-bounded `read_epoch` row slices. These public interfaces are sufficient for a
-plotting consumer without exposing the underlying HDF5 handle.
+bounded `read_epoch` row slices. These public interfaces are sufficient for an
+`envInSAR` analysis or export workflow without exposing the underlying HDF5 handle.
 
 Reader 通过 `reader.summary` 提供日期与维度，通过 `reader.metadata` 提供完整且
 经过校验的科学元数据，通过 `read_axis` 提供 X/Y 坐标，通过
 `grid_registration` 提供网格注册方式，并通过 `read_epoch` 的受控行切片提供数值。
-绘图消费端可完全使用这些公共接口，无需访问底层 HDF5 handle。
+`envInSAR` 中的分析或导出工作流可完全使用这些公共接口，无需访问底层 HDF5 handle；
+`envPlot` 绘图端只消费显式导出的交换文件。
 
 ## 10. Canonical PS/DS Point API / 标准 PS/DS 点 API
 
