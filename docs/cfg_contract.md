@@ -97,15 +97,15 @@ Coordinates are preserved without scaling, reprojection, or resampling. In `pres
 | `mask_file` | yes | headerless static mask; finite values greater than zero are valid |
 | `output_file` | yes | canonical HDF5 destination |
 | `*_dtype` | yes | explicit deformation, height, and mask NumPy numeric dtype |
-| `*_byte_order` | yes | explicit `big` or `little` for each binary role |
+| `*_byte_order` | yes | explicit `big`, `little`, or `native` (host byte order) for each binary role |
 | `deformation_unit` | yes | explicit source/output deformation unit; values are not scaled |
 | `height_unit` | yes | explicit real-elevation unit |
 | `crs` | yes | must explicitly be `EPSG:4326` for `corner_lon/corner_lat` |
 | `los_positive` | yes | explicit LOS sign convention |
-| `nodata_policy` | yes | additional explicit zero and invalid-value semantics |
+| `nodata_policy` | no | optional source note appended to the generated mask and sentinel description |
 | `deformation_nodata` | no | finite sentinel converted to NaN |
 | `height_nodata` | no | finite sentinel converted to NaN and marked invalid |
-| `spatial_reference` | yes | explicit upstream spatial reference description |
+| `spatial_reference` | no | known upstream reference pixel or region, for example `row=120,column=230,zero_based`; defaults to `unknown` |
 | `temporal_reference` | yes | `preserve` or `date` |
 | `source_temporal_reference` | conditional | required source-reference description for `preserve` |
 | `temporal_reference_date` | conditional | required date from `dates_file` for `date` |
@@ -117,6 +117,10 @@ Coordinates are preserved without scaling, reprojection, or resampling. In `pres
 Relative paths inside `tab_file` resolve from the tab directory. The adapter rejects duplicate paths/dates, mismatched manifest lengths, wrong byte counts, false grid registration, CRS conflicts, and non-rectilinear parameter files before publishing output. Radar-coordinate data and optional reprojection remain outside Phase 3C.
 
 `tab_file` 内的相对路径以 tab 所在目录解析。发布输出前，adapter 会拒绝重复路径/日期、清单长度不一致、错误字节数、虚假网格注册、CRS 冲突以及非规则网格参数文件。雷达坐标数据与可选重投影不属于第三阶段 C。
+
+The adapter records nodata rules from the mask and any configured sentinel values. A known spatial reference is copied into the HDF5 metadata; omitting it records `unknown`.
+
+程序根据显式掩膜和指定的哨兵值记录 nodata 规则。已知参考像元或区域时可用 `spatial_reference` 记录；省略时写入 `unknown`。
 
 ## 6. Canonical Point API and Future CFG / 标准点 API 与后续 CFG
 
@@ -144,6 +148,10 @@ controls include `aggregation` (default `mean`), `chunk_rows` (default 128),
 源/目标 CRS、倍率与对应输出单位、物理量、高程单位、LOS 符号、nodata、
 时空参考、来源及降采样方式。聚合方式、行块大小、是否写出 GeoTIFF 和是否覆盖
 均可选，默认分别为 `mean`、128、`false` 和 `true`。
+
+Boolean settings accept `true/yes/1/on` and `false/no/0/off` without case sensitivity. Select `factor`, `target_points`, or `target_pixel_size` and fill the corresponding numeric field. Pixel size uses the original grid axis unit. For GAMMA with explicit longitude and latitude binaries, it uses the output CRS unit after coordinate transformation.
+
+开关可用 `true/yes/1/on` 或 `false/no/0/off`，不区分大小写。从 `factor`、`target_points` 和 `target_pixel_size` 中选一种方式，并填写同名数值项。像元尺寸采用原网格坐标单位。GAMMA 提供逐像元经纬度时，采用变换后的输出 CRS 单位。
 
 - GAMMA additionally requires tab/date/parameter/DEM/mask paths and explicit
   binary dtype/byte order plus `source_unit`. Radar grids add paired

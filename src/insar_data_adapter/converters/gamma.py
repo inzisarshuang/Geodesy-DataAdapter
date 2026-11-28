@@ -81,12 +81,15 @@ def convert_gamma_grid(config: dict[str, Any]) -> Path:
 
         deformation_nodata = config["deformation_nodata"]
         height_nodata = config["height_nodata"]
-        nodata_actions = ["mask: finite and >0 is valid"]
+        nodata_actions = ["mask: finite and >0 is valid", "NaN is nodata"]
         if deformation_nodata is not None:
             nodata_actions.append(f"deformation {deformation_nodata:g} converted to NaN")
         if height_nodata is not None:
             nodata_actions.append(f"height {height_nodata:g} converted to NaN and invalid")
-        nodata_policy = "; ".join(nodata_actions + [str(config["nodata_policy"]).strip()])
+        if deformation_nodata != 0:
+            nodata_actions.append("zero is not a deformation nodata sentinel")
+        if note := str(config.get("nodata_policy", "")).strip():
+            nodata_actions.append(note)
         provenance = (
             f"tab={source.tab_path};dates={source.dates_path};par={source.parameter_path};"
             f"height={source.height_path};mask={source.mask_path};"
@@ -100,9 +103,9 @@ def convert_gamma_grid(config: dict[str, Any]) -> Path:
             deformation_quantity="cumulative_displacement",
             los_positive=str(config["los_positive"]),
             crs=configured_crs,
-            nodata_policy=nodata_policy,
+            nodata_policy="; ".join(nodata_actions),
             temporal_reference=applied_temporal_reference,
-            spatial_reference=str(config["spatial_reference"]),
+            spatial_reference=str(config.get("spatial_reference", "unknown")),
             source_provenance=provenance,
             height_unit=str(config["height_unit"]),
             grid_registration=str(config["grid_registration"]),

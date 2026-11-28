@@ -131,7 +131,36 @@ class GammaConversionTests(unittest.TestCase):
             self.assertEqual(handle.attrs["deformation_unit"], "m")
             self.assertEqual(handle.attrs["temporal_reference"], "gamma_native_solution")
             self.assertIn("deformation -9999 converted to NaN", handle.attrs["nodata_policy"])
+            self.assertIn("zero displacement is valid", handle.attrs["nodata_policy"])
+            self.assertEqual(
+                handle.attrs["spatial_reference"],
+                "upstream_reference_area=documented_elsewhere",
+            )
             self.assertIn("deformation_binary=>f4", handle.attrs["source_provenance"])
+
+    def test_conversion_records_metadata_without_free_text_settings(self) -> None:
+        """Generate nodata metadata and record an unknown spatial reference."""
+        self.values[0, 0, 1] = 0
+        self.values[0].astype(">f4").tofile(self.root / "D1.bin")
+        path = self._write_config()
+        lines = path.read_text(encoding="utf-8").splitlines()
+        path.write_text(
+            "\n".join(
+                line for line in lines
+                if not line.startswith(("nodata_policy =", "spatial_reference ="))
+            ) + "\n",
+            encoding="utf-8",
+        )
+
+        convert_gamma_grid(load_gamma_conversion_config(path))
+
+        with h5py.File(self.output, "r") as handle:
+            self.assertEqual(handle.attrs["spatial_reference"], "unknown")
+            policy = handle.attrs["nodata_policy"]
+            self.assertIn("mask: finite and >0 is valid", policy)
+            self.assertIn("deformation -9999 converted to NaN", policy)
+            self.assertIn("zero is not a deformation nodata sentinel", policy)
+            self.assertEqual(handle["data/displacement"][0, 0, 1], 0)
 
     def test_date_reference_subtracts_selected_epoch(self) -> None:
         """Apply a configured temporal reference while keeping memory bounded by rows."""

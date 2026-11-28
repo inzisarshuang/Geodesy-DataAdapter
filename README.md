@@ -62,6 +62,13 @@ Core dependencies are declared in `pyproject.toml`. Optional readers may require
 
 ## 5. Quick Start / 快速开始
 
+Use `--config` for the selected operation. For HDF5 inspection and validation,
+use the read-only `inspect` and `validate` subcommands. Conversion and export
+destinations use `output_file` for one file and `output_dir` for a Defsour snapshot.
+
+使用 `--config` 指定本次操作的配置文件。HDF5 预检用只读的 `inspect` 和
+`validate` 子命令。单文件转换使用 `output_file`，Defsour 快照使用 `output_dir`。
+
 Inspect a source product before conversion:
 
 ```bash

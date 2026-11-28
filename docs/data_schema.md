@@ -17,7 +17,7 @@ Every canonical file must record the following root attributes.
 | `crs` | EPSG, WKT, or another unambiguous CRS representation |
 | `nodata_policy` | Meaning of NaN, finite nodata, mask, and zero |
 | `temporal_reference` | Preserved, first, or an explicit epoch identifier |
-| `spatial_reference` | Reference pixel/point description or `none` |
+| `spatial_reference` | Reference pixel/point/area description, `none` if absent, or `unknown` if unspecified |
 | `source_provenance` | Source paths or a manifest reference |
 | `write_complete` | `true` only after every required block has been written and validated |
 

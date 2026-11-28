@@ -185,6 +185,38 @@ refarea_dataset = refarea
             with self.assertRaisesRegex(ValueError, "unknown cfg key"):
                 load_licsbas_defsour_config(licsbas)
 
+    def test_gamma_accepts_documented_symbolic_modes(self) -> None:
+        """Check documented case normalization and the conditional companion keys."""
+        with tempfile.TemporaryDirectory() as directory:
+            config = self.gamma(Path(directory))
+            text = config.read_text(encoding="utf-8")
+            variants = (
+                ("native", "factor", "factor = 2", "first"),
+                ("ALIGNED", "TARGET_POINTS", "target_points = 100", "preserve"),
+                ("native", "target_pixel_size", "target_pixel_size = 90", "20240113"),
+            )
+            for mode, strategy, size_field, reference in variants:
+                with self.subTest(mode=mode, strategy=strategy, reference=reference):
+                    variant = (
+                        text.replace("mode = native", f"mode = {mode}")
+                        .replace("downsample_mode = factor", f"downsample_mode = {strategy}")
+                        .replace("factor = 2", size_field)
+                        .replace("temporal_reference = first", f"temporal_reference = {reference}")
+                        .replace("aggregation = mean", "aggregation = MEDIAN")
+                        .replace("deformation_byte_order = big", "deformation_byte_order = LITTLE")
+                        .replace("write_tif = true", "write_tif = no")
+                    )
+                    if mode.lower() == "aligned":
+                        variant += "alignment_template = output/alignment_template.npz\n"
+                    config.write_text(variant, encoding="utf-8")
+                    loaded = load_gamma_defsour_config(config)
+                    self.assertEqual(loaded.mode, mode.lower())
+                    self.assertEqual(loaded.downsample_mode, strategy.lower())
+                    self.assertEqual(loaded.temporal_reference, reference)
+                    self.assertEqual(loaded.aggregation, "median")
+                    self.assertEqual(loaded.deformation_byte_order, "little")
+                    self.assertFalse(loaded.write_tif)
+
     def test_gamma_source_unit_is_required_and_controls_scaling(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
